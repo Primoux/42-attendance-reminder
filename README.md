@@ -61,30 +61,45 @@ Clique sur l'icône de l'extension.
 
 - **Prévenir avant l'échéance** : préavis en minutes (défaut 30).
 - **Relancer toutes les** : intervalle des rappels.
-- **Mode test** : débloque la saisie du préavis en secondes (min 5 s) pour
-  vérifier que la chaîne complète marche sans attendre des heures.
-- **Logs console détaillés** : trace chaque tick dans la console de la page
-  attendance et dans celle du background.
+
+Deux réglages n'ont pas de champ dans le popup et se posent depuis la console
+du background (`about:debugging` → Inspecter) :
+
+```js
+browser.storage.local.get('settings').then(({ settings }) =>
+  browser.storage.local.set({ settings: { ...settings, debug: true } }));
+```
+
+- `debug` : trace chaque tick dans la console de la page attendance et du
+  background.
+- `testMode` : autorise un `warnBeforeSeconds` descendant à 5 s, pour vérifier
+  la chaîne de notification sans attendre des heures.
 
 Le préavis est borné à 1 min minimum : impossible de configurer une alerte qui
 arrive trop tard.
 
 ## Développement
 
+Le code de la branche `main` est celui qui part sur AMO : pas de tests, pas
+d'outillage. Le développement et les tests vivent sur la branche `dev`.
+
 ```sh
 npm install -g web-ext
 npm run dev      # Firefox dédié, rechargement auto à chaque sauvegarde
-npm run build    # génère le .zip à envoyer sur addons.mozilla.org
-npm test
+npm run build    # .zip non signé
+npm run sign     # .xpi signé par Mozilla (auto-distribution)
 ```
 
-- `test/parser.test.js` : détection DOM et logique de notification, sur un faux
-  DOM minimal (`test/fakedom.js`).
-- `test/background.test.js` : charge `parser.js` + `background.js` dans un faux
-  `browser` (promesses, comme Firefox) et exerce la machine à états — création
-  de session, anti-spam, badge out, rebadge, `getStatus`, `resetStats`.
+`npm run sign` a besoin de clés d'API AMO, à passer par l'environnement et
+**jamais** à committer :
 
-Micro-runner maison (`test/tiny.js`), zéro dépendance, marche depuis Node 12.
+```sh
+export WEB_EXT_API_KEY=user:12345678:123
+export WEB_EXT_API_SECRET=...
+```
+
+Chaque envoi exige un numéro de version inédit : incrémente `version` dans
+`manifest.json` avant de signer.
 
 ## Fichiers
 
@@ -96,7 +111,6 @@ Micro-runner maison (`test/tiny.js`), zéro dépendance, marche depuis Node 12.
 | `background.js` | état des sessions, notifications, historique |
 | `popup.html` / `popup.js` | UI (thème clair/sombre auto) |
 | `icon-*.svg` | icônes 16/48/96/128 (chronomètre + pastille d'alerte) |
-| `test/` | tests |
 
 ## Notes
 

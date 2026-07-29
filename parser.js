@@ -19,8 +19,8 @@ const STATUS = {
 const DEFAULT_SETTINGS = {
   warnBeforeSeconds: 30 * 60, // prévenir 30 min avant l'échéance annoncée
   repeatSeconds: 15 * 60,     // relance toutes les 15 min tant qu'on est badgé
-  testMode: false,            // autorise des seuils en secondes pour tester
-  debug: true
+  testMode: false,            // seuils en secondes ; réglable via storage.local
+  debug: false                // logs console détaillés ; idem
 };
 
 // "On Site Unsaved", "On site (unsaved)", "ON-SITE - UNSAVED"...

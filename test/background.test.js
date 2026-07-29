@@ -82,7 +82,11 @@ test('background.js se charge sans exception et enregistre ses listeners', () =>
 test('les notifications utilisent l\'icône empaquetée', async () => {
   const fake = makeFakeBrowser();
   loadBackground(fake);
-  await fake._captured.listeners.message({ action: 'testNotification' });
+  await fake._captured.listeners.message({
+    action: 'badgeState',
+    state: { status: 'on_site', startMs: Date.now() - 3.6 * 3600 * 1000 },
+    at: Date.now()
+  });
   const notif = fake._captured.notifications[0];
   assert.ok(notif, 'aucune notification créée');
   assert.strictEqual(notif.iconUrl, 'moz-extension://test/icon-48.svg');

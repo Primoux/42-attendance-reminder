@@ -174,14 +174,6 @@ api.runtime.onMessage.addListener((message) => {
     case 'openIntra':
       return openIntra();
 
-    case 'testNotification':
-      return api.notifications.create(NOTIFICATION_ID + '-test', {
-        type: 'basic',
-        iconUrl: ICON_URL,
-        title: '✅ Test',
-        message: 'Les notifications fonctionnent.'
-      }).then(() => ({ ok: true }));
-
     default:
       return undefined;
   }

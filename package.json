@@ -6,6 +6,7 @@
   "scripts": {
     "test": "node test/parser.test.js && node test/background.test.js",
     "dev": "web-ext run",
-    "build": "web-ext build --overwrite-dest"
+    "build": "web-ext build --overwrite-dest",
+    "sign": "web-ext sign --channel=unlisted"
   }
 }
