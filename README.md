@@ -83,24 +83,28 @@ arrive trop tard.
 Le code de la branche `main` est celui qui part sur AMO : pas de tests, pas
 d'outillage. Le développement et les tests vivent sur la branche `dev`.
 
-`web-ext` est récupéré à la volée par `npx`, rien à installer.
-
 ```sh
-npm run dev      # Firefox dédié, rechargement auto à chaque sauvegarde
-npm run build    # .zip non signé
-npm run sign     # .xpi signé par Mozilla (auto-distribution)
+npm run build    # web-ext-artifacts/42-attendance-reminder.zip
 ```
 
-`npm run sign` a besoin de clés d'API AMO, à passer par l'environnement et
-**jamais** à committer :
+Le zip est fabriqué avec `zip(1)` et liste explicitement les fichiers
+empaquetés : aucun fichier parasite ne part sur AMO. Ajouter un fichier au
+paquet demande de compléter la liste dans `package.json`.
 
-```sh
-export WEB_EXT_API_KEY=user:12345678:123
-export WEB_EXT_API_SECRET=...
-```
+`web-ext` n'est pas utilisé : il exige Node >= 16 et ne suffit pas au
+rechargement automatique ici. Pour tester en local, charge le dossier via
+`about:debugging` → « Charger un module temporaire ».
 
-Chaque envoi exige un numéro de version inédit : incrémente `version` dans
-`manifest.json` avant de signer.
+## Publier
+
+1. Incrémente `version` dans `manifest.json` — AMO refuse une version déjà
+   envoyée, définitivement.
+2. `npm run build`
+3. [addons.mozilla.org/developers](https://addons.mozilla.org/developers/) →
+   *Submit a New Add-on* → **On your own** (auto-distribution, validation
+   automatique) ou *On this site* (revue humaine, publication publique).
+4. Envoie le zip. Le `.xpi` signé est proposé au téléchargement.
+5. Tes potes ouvrent le `.xpi` dans Firefox : l'installation est permanente.
 
 ## Fichiers
 
