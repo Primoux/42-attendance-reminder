@@ -106,11 +106,10 @@ async function refresh(applyInputs) {
     if (applyInputs) applySettings(info.settings);
     renderStatus(info);
   } catch (err) {
-    // Cas classique : le popup est relu depuis le disque à chaque ouverture,
-    // alors que le background reste celui chargé à l'installation. Après une
-    // modif du code, il faut "Recharger" l'extension dans about:debugging.
+    // Le popup est relu à chaque ouverture, pas le background : en dev, après
+    // une modif, il faut recharger l'extension pour que les deux concordent.
     const detail = err && err.message ? err.message : String(err);
-    el('statusText').textContent = `Background injoignable — recharge l'extension (about:debugging). [${detail}]`;
+    el('statusText').textContent = `Extension à recharger. [${detail}]`;
     console.warn('[42 Reminder/popup]', err);
   }
 }
