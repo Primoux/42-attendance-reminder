@@ -5,8 +5,8 @@
   "private": true,
   "scripts": {
     "test": "node test/parser.test.js && node test/background.test.js",
-    "dev": "web-ext run",
-    "build": "web-ext build --overwrite-dest",
-    "sign": "web-ext sign --channel=unlisted"
+    "dev": "npx --yes web-ext run",
+    "build": "npx --yes web-ext build --overwrite-dest",
+    "sign": "npx --yes web-ext sign --channel=unlisted"
   }
 }
