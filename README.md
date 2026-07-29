@@ -142,3 +142,7 @@ rechargement automatique ici. Pour tester en local, charge le dossier via
 ## Bugs/Améliorations?
 
 Partage sur Discord ou fais une PR.
+
+## Licence
+
+MIT — voir [LICENSE](LICENSE).
