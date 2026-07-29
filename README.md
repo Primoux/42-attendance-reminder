@@ -83,8 +83,9 @@ arrive trop tard.
 Le code de la branche `main` est celui qui part sur AMO : pas de tests, pas
 d'outillage. Le développement et les tests vivent sur la branche `dev`.
 
+`web-ext` est récupéré à la volée par `npx`, rien à installer.
+
 ```sh
-npm install -g web-ext
 npm run dev      # Firefox dédié, rechargement auto à chaque sauvegarde
 npm run build    # .zip non signé
 npm run sign     # .xpi signé par Mozilla (auto-distribution)
