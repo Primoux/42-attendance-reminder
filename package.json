@@ -4,8 +4,8 @@
   "description": "Extension Firefox : prévient avant de perdre son logtime à 3h59",
   "private": true,
   "scripts": {
-    "dev": "web-ext run",
-    "build": "web-ext build --overwrite-dest",
-    "sign": "web-ext sign --channel=unlisted"
+    "dev": "npx --yes web-ext run",
+    "build": "npx --yes web-ext build --overwrite-dest",
+    "sign": "npx --yes web-ext sign --channel=unlisted"
   }
 }
