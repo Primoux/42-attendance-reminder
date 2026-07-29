@@ -249,22 +249,3 @@ test('formatDuration', () => {
   assert.strictEqual(P.formatDuration(9), '9s');
   assert.strictEqual(P.formatDuration(-5), '0s');
 });
-
-test('computeStats agrège l\'historique', () => {
-  const history = [
-    { durationSeconds: 3600, alerted: false },
-    { durationSeconds: P.LOGTIME_LOST_SECONDS + 60, alerted: true },
-    { durationSeconds: 7200, alerted: true }
-  ];
-  const stats = P.computeStats(history);
-  assert.strictEqual(stats.sessions, 3);
-  assert.strictEqual(stats.longestSeconds, P.LOGTIME_LOST_SECONDS + 60);
-  assert.strictEqual(stats.logtimeLost, 1);
-  assert.strictEqual(stats.alerted, 2);
-  assert.strictEqual(stats.averageSeconds, Math.round((3600 + P.LOGTIME_LOST_SECONDS + 60 + 7200) / 3));
-});
-
-test('computeStats supporte un historique vide', () => {
-  assert.deepStrictEqual(P.computeStats([]).sessions, 0);
-  assert.deepStrictEqual(P.computeStats(undefined).longestSeconds, 0);
-});

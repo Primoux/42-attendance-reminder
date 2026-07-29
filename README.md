@@ -69,12 +69,6 @@ Clique sur l'icône de l'extension.
 Le préavis est borné à 1 min minimum : impossible de configurer une alerte qui
 arrive trop tard.
 
-## Historique
-
-Les 50 dernières sessions restent enregistrées dans `storage.local` (durée,
-alerte déclenchée) mais ne sont plus affichées. Le message `resetStats` du
-background les efface.
-
 ## Développement
 
 ```sh

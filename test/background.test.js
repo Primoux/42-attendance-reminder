@@ -65,7 +65,7 @@ function loadBackground(fakeBrowser) {
     .join('\n;\n');
   const factory = new Function(
     'browser', 'chrome', 'console', 'module',
-    `${src}\n;return { handleBadgeState, evaluate, LOGTIME_LOST_SECONDS, STATUS };`
+    `${src}\n;return { handleBadgeState, evaluate, SESSION_MAX_SECONDS, STATUS };`
   );
   const quietConsole = { log() {}, warn() {}, error() {} };
   return factory(fakeBrowser, undefined, quietConsole, { exports: {} });
@@ -94,7 +94,6 @@ test('getStatus répond au popup', async () => {
   const info = await fake._captured.listeners.message({ action: 'getStatus' });
   assert.ok(info, 'aucune réponse : le popup afficherait "Background injoignable"');
   assert.strictEqual(info.session, null);
-  assert.strictEqual(info.stats.sessions, 0);
   assert.ok(info.sessionMaxSeconds > 0);
   assert.ok(info.settings.warnBeforeSeconds > 0);
 });
@@ -112,12 +111,11 @@ test('une session est créée, notifiée une fois, puis clôturée au badge out'
   await send({ action: 'badgeState', state: { status: 'on_site', startMs: start }, at: Date.now() + 60000 });
   assert.strictEqual(fake._captured.notifications.length, 1, 'notification en double');
 
-  // badge out : la session part dans l'historique
+  // badge out : le timer est remis à zéro
   await send({ action: 'badgeState', state: { status: 'off_site', startMs: null }, at: Date.now() });
   const info = await send({ action: 'getStatus' });
   assert.strictEqual(info.session, null, 'session non réinitialisée après badge out');
-  assert.strictEqual(info.stats.sessions, 1);
-  assert.strictEqual(info.stats.alerted, 1);
+  assert.strictEqual(info.expiryMs, null);
 });
 
 test('un statut unknown ne détruit pas la session en cours', async () => {
@@ -177,16 +175,4 @@ test('rebadger repousse l\'échéance et relance le cycle d\'alerte', async () =
   assert.strictEqual(info.session.notifiedCount, 0, 'cycle d\'alerte non réinitialisé');
   assert.strictEqual(info.session.startMs, start, 'le début de présence doit être conservé');
   assert.ok(info.remainingSeconds > 3.9 * 3600);
-});
-
-test('resetStats vide l\'historique', async () => {
-  const fake = makeFakeBrowser();
-  loadBackground(fake);
-  const send = (msg) => fake._captured.listeners.message(msg);
-  const start = Date.now() - 3600 * 1000;
-  await send({ action: 'badgeState', state: { status: 'on_site', startMs: start }, at: Date.now() });
-  await send({ action: 'badgeState', state: { status: 'off_site', startMs: null }, at: Date.now() });
-  assert.strictEqual((await send({ action: 'getStatus' })).stats.sessions, 1);
-  await send({ action: 'resetStats' });
-  assert.strictEqual((await send({ action: 'getStatus' })).stats.sessions, 0);
 });

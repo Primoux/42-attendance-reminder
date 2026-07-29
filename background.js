@@ -7,13 +7,11 @@
 const api = typeof browser !== 'undefined' ? browser : chrome;
 
 const ALARM_NAME = '42-reminder-tick';
-const HISTORY_MAX = 50;
 const NOTIFICATION_ID = '42-reminder';
 const ICON_URL = api.runtime.getURL('icon-48.svg');
 
 const EMPTY_STATE = {
-  session: null,   // { startMs, status, lastSeenMs, notifiedCount, lastNotifiedMs, alerted }
-  history: [],
+  session: null, // { startMs, expiryMs, status, lastSeenMs, notifiedCount, lastNotifiedMs }
   lastStatus: STATUS.UNKNOWN
 };
 
@@ -35,24 +33,6 @@ function log(settings, ...args) {
   if (settings.debug) console.log('[42 Reminder/bg]', ...args);
 }
 
-/** Clôt la session courante et la range dans l'historique. */
-function closeSession(state, endMs) {
-  if (!state.session || !state.session.startMs) {
-    state.session = null;
-    return null;
-  }
-  const durationSeconds = Math.max(0, Math.round((endMs - state.session.startMs) / 1000));
-  const entry = {
-    startMs: state.session.startMs,
-    endMs,
-    durationSeconds,
-    alerted: Boolean(state.session.alerted)
-  };
-  state.history = [entry].concat(state.history || []).slice(0, HISTORY_MAX);
-  state.session = null;
-  return entry;
-}
-
 async function handleBadgeState(message) {
   const settings = await getSettings();
   const state = await getState();
@@ -68,8 +48,7 @@ async function handleBadgeState(message) {
         status: incoming.status,
         lastSeenMs: now,
         notifiedCount: 0,
-        lastNotifiedMs: 0,
-        alerted: false
+        lastNotifiedMs: 0
       };
       log(settings, 'nouvelle session, échéance', formatClock(sessionExpiry(state.session)));
     } else {
@@ -89,8 +68,8 @@ async function handleBadgeState(message) {
     }
   } else if (incoming.status === STATUS.OFF_SITE) {
     if (state.session) {
-      const closed = closeSession(state, now);
-      log(settings, 'badge out détecté, session de', formatDuration(closed.durationSeconds));
+      log(settings, 'badge out détecté, session terminée');
+      state.session = null;
       await api.notifications.clear(NOTIFICATION_ID).catch(() => {});
     }
   }
@@ -139,7 +118,6 @@ async function evaluate(now, settings, preloadedState) {
 
   state.session.notifiedCount = (state.session.notifiedCount || 0) + 1;
   state.session.lastNotifiedMs = now;
-  state.session.alerted = true;
   await setState(state);
   log(s, `notification "${decision.kind}" envoyée (${elapsed})`);
 }
@@ -189,21 +167,12 @@ api.runtime.onMessage.addListener((message) => {
           elapsedSeconds: state.session && state.session.startMs
             ? Math.floor((now - state.session.startMs) / 1000)
             : null,
-          stats: computeStats(state.history),
           sessionMaxSeconds: SESSION_MAX_SECONDS
         };
       })();
 
     case 'openIntra':
       return openIntra();
-
-    case 'resetStats':
-      return (async () => {
-        const state = await getState();
-        state.history = [];
-        await setState(state);
-        return { ok: true };
-      })();
 
     case 'testNotification':
       return api.notifications.create(NOTIFICATION_ID + '-test', {

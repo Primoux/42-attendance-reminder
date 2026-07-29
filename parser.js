@@ -4,7 +4,6 @@
  * une racine en argument) => testable dans Node avec un faux DOM.
  */
 
-const LOGTIME_LOST_SECONDS = 3 * 3600 + 59 * 60; // 3h59 : logtime lost (l'intra te débadge)
 // attendance.42lyon.fr fixe l'échéance à 4h après le dernier clock-in
 // (badge à 10:31 -> "expire à 14:31"). Sert à déduire le début quand seule
 // l'échéance est affichée.
@@ -108,12 +107,7 @@ function collectCandidates(root, maxTextLength = 400) {
     const text = normalize(el.textContent);
     if (!text || text.length > maxTextLength) continue;
     if (!RE_ON_SITE.test(text) && !RE_OFF_SITE.test(text)) continue;
-    out.push({
-      text,
-      iso: readIsoAttr(el),
-      tag: (el.tagName || '').toLowerCase(),
-      cls: normalize(typeof el.className === 'string' ? el.className : '')
-    });
+    out.push({ text, iso: readIsoAttr(el) });
   }
   return out;
 }
@@ -313,26 +307,11 @@ function formatClock(ms) {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-/** Agrège l'historique des sessions pour la popup. */
-function computeStats(history) {
-  const list = Array.isArray(history) ? history : [];
-  const stats = { sessions: list.length, longestSeconds: 0, totalSeconds: 0, averageSeconds: 0, logtimeLost: 0, alerted: 0 };
-  for (const s of list) {
-    const d = Math.max(0, Number(s.durationSeconds) || 0);
-    stats.totalSeconds += d;
-    if (d > stats.longestSeconds) stats.longestSeconds = d;
-    if (d >= LOGTIME_LOST_SECONDS) stats.logtimeLost += 1;
-    if (s.alerted) stats.alerted += 1;
-  }
-  if (list.length) stats.averageSeconds = Math.round(stats.totalSeconds / list.length);
-  return stats;
-}
-
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
-    LOGTIME_LOST_SECONDS, SESSION_MAX_SECONDS, STATUS, DEFAULT_SETTINGS,
+    SESSION_MAX_SECONDS, STATUS, DEFAULT_SETTINGS,
     normalize, findTimes, resolveClockTime, parseIso, readIsoAttr,
     collectCandidates, analyze, detect, detectExpiry, findShortestMatch, isOnSite, sessionExpiry,
-    decideNotification, clampWarnBefore, formatDuration, formatClock, computeStats
+    decideNotification, clampWarnBefore, formatDuration, formatClock
   };
 }
