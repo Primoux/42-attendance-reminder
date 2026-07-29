@@ -1,0 +1,141 @@
+# 42 Attendance Reminder
+
+Extension Firefox qui te prévient **avant** que ta session d'attendance expire et
+que tu perdes ton logtime.
+
+Cible `attendance.42lyon.fr` (et `*.intra.42.fr` en secours).
+
+## Installation
+
+### Temporaire (pour tester)
+
+1. `about:debugging#/runtime/this-firefox`
+2. "Load Temporary Add-on" → sélectionne `manifest.json`
+3. Se désactive au redémarrage de Firefox.
+
+### Dev (rechargement auto)
+
+```sh
+npm install -g web-ext
+web-ext run
+```
+
+## Comment ça marche
+
+- `content.js` observe la page intra (tick toutes les 15 s + MutationObserver sur
+  les rechargements ajax) et rapporte l'état de badge au background.
+- `background.js` est seul à décider des notifications. Tout son état vit dans
+  `storage.local` : en MV3 la page background est non-persistante, la mémoire est
+  perdue à tout moment.
+- Une alarme d'une minute prend le relais : même sans onglet intra ouvert, le
+  compteur continue et l'alerte part.
+
+### Détection
+
+La page d'attendance affiche elle-même son échéance : c'est la source la plus
+fiable, aucune déduction n'est nécessaire.
+
+| Signal | Priorité |
+|---|---|
+| `LA SESSION EXPIRE À 14:31` | la plus haute — échéance exacte |
+| compte à rebours `03h08m` | échéance = maintenant + reste |
+| attribut `datetime` ISO | heure de badge, immunisé aux fuseaux |
+| `On Site 10:31` | heure de badge, échéance déduite (+4h) |
+| ligne dont une heure colle à maintenant | c'est la ligne en cours, pas une archive |
+| deux heures entièrement passées | session terminée → `off_site` |
+
+Une ligne d'attendance se termine par sa durée (`On Site Unsaved 10:31 → 11:22
+00:51`) : ce `00:51` se lit comme une heure, d'où la règle « une heure proche de
+maintenant » plutôt que « la dernière heure de la ligne ».
+
+Sont gérés : `On Site`, `On Site Unsaved`, `On site (unsaved)`, séparateurs `:`
+ou `h`, heure de la veille (badge après minuit), et le badge out (reset du timer
+et rangement de la session dans l'historique).
+
+Si aucun marqueur n'est trouvé, l'état passe à `unknown` et la session **n'est pas**
+effacée — le DOM de l'intra peut changer, on préfère garder le timer que le perdre.
+
+### Anti-spam
+
+Une seule notification au franchissement du préavis, puis une relance toutes les
+15 min (configurable), et une alerte prioritaire dans les 5 dernières minutes
+(au plus une par minute). L'état de notification est persisté : recharger la
+page ou l'extension ne re-notifie pas.
+
+Rebadger repousse l'échéance : le cycle d'alerte repart à zéro, mais la présence
+en cours et son heure de début sont conservées.
+
+## Configuration
+
+Icône de l'extension, ou **Ctrl+Shift+A**.
+
+> Ce raccourci est aussi celui du gestionnaire d'add-ons de Firefox. S'il ne
+> répond pas, change-le dans `about:addons` → engrenage → "Gérer les raccourcis".
+
+- **Prévenir avant l'échéance** : préavis en minutes (défaut 30).
+- **Relancer toutes les** : intervalle des rappels.
+- **Mode test** : débloque la saisie du préavis en secondes (min 5 s) pour
+  vérifier que la chaîne complète marche sans attendre des heures.
+- **Logs console détaillés** : trace chaque tick dans la console de la page intra
+  et dans celle du background (`about:debugging` → Inspecter).
+
+Le préavis est borné à 1 min minimum : impossible de configurer une alerte qui
+arrive trop tard.
+
+## Historique
+
+Les 50 dernières sessions restent enregistrées dans `storage.local` (durée,
+alerte déclenchée) mais ne sont plus affichées. Le message `resetStats` du
+background les efface.
+
+## Tests
+
+```sh
+npm test        # ou: node test/parser.test.js
+```
+
+- `test/parser.test.js` : détection DOM et logique de notification, sur un faux
+  DOM minimal (`test/fakedom.js`).
+- `test/background.test.js` : charge `parser.js` + `background.js` dans un faux
+  `browser` (promesses, comme Firefox) et exerce la machine à états — création
+  de session, anti-spam, badge out, rebadge, `getStatus`, `resetStats`.
+
+Micro-runner maison (`test/tiny.js`), zéro dépendance, marche depuis Node 12.
+
+## Après une modif du code
+
+Le popup est relu depuis le disque à chaque ouverture, **pas le background** :
+celui-ci reste celui chargé à l'installation. Si le popup affiche
+« Background injoignable », clique sur **Recharger** dans `about:debugging`.
+`web-ext run` le fait tout seul.
+
+Et après un rechargement de l'extension, les onglets intra **déjà ouverts**
+n'ont plus de content script (Firefox n'injecte que dans les pages chargées
+ensuite). Le bouton « Ouvrir l'attendance » du popup gère les deux cas : il réutilise un
+onglet attendance existant en le rechargeant, sinon il en ouvre un.
+
+## Fichiers
+
+| Fichier | Rôle |
+|---|---|
+| `manifest.json` | config MV3 |
+| `parser.js` | logique pure, partagée par tous les scripts et les tests |
+| `content.js` | observation du DOM intra |
+| `background.js` | état des sessions, notifications, historique |
+| `popup.html` / `popup.js` | UI (thème clair/sombre auto) |
+| `test/` | tests |
+
+## Notes
+
+- Uniquement sur `attendance.42lyon.fr` et `*.intra.42.fr`, aucune donnée ne sort
+  du navigateur. Autre campus : ajoute son domaine dans `manifest.json`
+  (`host_permissions` **et** `content_scripts[0].matches`).
+- Vanilla JS, aucune dépendance.
+- Fuseaux horaires : l'heure murale de l'intra est interprétée dans le fuseau du
+  navigateur. Si l'écart donne un temps négatif ou > 24 h, la valeur est
+  rejetée plutôt que d'afficher n'importe quoi. Quand l'intra expose un
+  timestamp ISO, il est préféré et le problème ne se pose pas.
+
+## Bugs/Améliorations?
+
+Partage sur Discord ou fais une PR.

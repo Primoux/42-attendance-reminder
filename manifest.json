@@ -1,0 +1,52 @@
+{
+  "manifest_version": 3,
+  "name": "42 Attendance Reminder",
+  "version": "2.0",
+  "description": "Notifie quand tu as badgé depuis trop longtemps (logtime lost à 3h59)",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "42-attendance-reminder@enchevri",
+      "strict_min_version": "115.0"
+    }
+  },
+  "permissions": [
+    "notifications",
+    "storage",
+    "alarms"
+  ],
+  "host_permissions": [
+    "*://*.intra.42.fr/*",
+    "*://attendance.42lyon.fr/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.intra.42.fr/*",
+        "*://attendance.42lyon.fr/*"
+      ],
+      "js": [
+        "parser.js",
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "42 Reminder"
+  },
+  "background": {
+    "scripts": [
+      "parser.js",
+      "background.js"
+    ]
+  },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+A"
+      },
+      "description": "Ouvrir 42 Reminder"
+    }
+  }
+}

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>42 Reminder</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #ffffff;
+      --fg: #1c1b22;
+      --muted: #5b5b66;
+      --border: #dcdce0;
+      --field: #ffffff;
+      --accent: #0060df;
+      --accent-hover: #0250bb;
+      --ok: #1f8a4c;
+      --warn: #c9500f;
+      --danger: #d7263d;
+      --card: #f6f6f8;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #23222b;
+        --fg: #fbfbfe;
+        --muted: #b1b1bb;
+        --border: #3a3944;
+        --field: #1c1b22;
+        --accent: #00ddff;
+        --accent-hover: #80ebff;
+        --ok: #54ffbd;
+        --warn: #ffb787;
+        --danger: #ff9aa2;
+        --card: #2b2a33;
+      }
+      button.primary { color: #15141a; }
+    }
+
+    body {
+      width: 320px;
+      margin: 0;
+      padding: 14px;
+      background: var(--bg);
+      color: var(--fg);
+      font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    h1 { font-size: 15px; margin: 0 0 10px; display: flex; justify-content: space-between; align-items: baseline; }
+    h1 small { font-size: 11px; font-weight: normal; color: var(--muted); }
+    h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 16px 0 6px; }
+
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 10px; }
+    .status-line { display: flex; align-items: baseline; gap: 6px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+    .dot.on { background: var(--ok); }
+    .dot.warn { background: var(--warn); }
+    .dot.danger { background: var(--danger); }
+    #elapsed { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+    #statusText { color: var(--muted); font-size: 12px; }
+    .bar { height: 4px; border-radius: 2px; background: var(--border); margin-top: 8px; overflow: hidden; }
+    .bar > div { height: 100%; width: 0; background: var(--ok); transition: width .3s; }
+    .bar > div.warn { background: var(--warn); }
+    .bar > div.danger { background: var(--danger); }
+
+    .open-intra { margin-top: 8px; width: 100%; font-size: 12px; padding: 5px; }
+    .open-intra[hidden] { display: none; }
+
+    .row { display: flex; gap: 8px; align-items: center; }
+    .row label { flex: 1; color: var(--muted); }
+    input[type="number"] {
+      width: 62px; padding: 5px 6px; text-align: right;
+      background: var(--field); color: var(--fg);
+      border: 1px solid var(--border); border-radius: 4px; font-size: 13px;
+    }
+    input[type="checkbox"] { accent-color: var(--accent); }
+    .checkline { display: flex; align-items: center; gap: 8px; margin-top: 8px; color: var(--muted); }
+    .checkline label { cursor: pointer; }
+
+    button {
+      border: 1px solid var(--border); border-radius: 4px; cursor: pointer;
+      padding: 7px 10px; font-size: 13px; background: var(--card); color: var(--fg);
+    }
+    button:hover { border-color: var(--accent); }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; flex: 1; }
+    button.primary:hover { background: var(--accent-hover); }
+    .actions { display: flex; gap: 8px; margin-top: 12px; }
+    #msg { min-height: 16px; font-size: 12px; margin-top: 8px; text-align: center; color: var(--ok); }
+    #msg.error { color: var(--danger); }
+    .hint { font-size: 11px; color: var(--muted); margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <h1>⏰ 42 Reminder <small id="logtimeInfo"></small></h1>
+
+  <div class="card">
+    <div class="status-line">
+      <span class="dot" id="dot"></span>
+      <span id="elapsed">—</span>
+    </div>
+    <div id="statusText">Chargement…</div>
+    <button id="openIntra" class="open-intra" hidden>Ouvrir l'attendance ↗</button>
+    <div class="bar"><div id="barFill"></div></div>
+  </div>
+
+  <h2>Alerte</h2>
+  <div class="row">
+    <label for="minutes">Prévenir avant l'échéance</label>
+    <input type="number" id="minutes" min="1" max="239" step="1"> <span>min</span>
+  </div>
+  <div class="row" style="margin-top:6px">
+    <label for="repeat">Relancer toutes les</label>
+    <input type="number" id="repeat" min="1" max="120" step="1"> <span>min</span>
+  </div>
+  <div class="row" id="secondsRow" style="margin-top:6px; display:none">
+    <label for="seconds">Préavis exact (secondes)</label>
+    <input type="number" id="seconds" min="5" step="1" style="width:80px">
+  </div>
+
+  <div class="checkline">
+    <input type="checkbox" id="testMode">
+    <label for="testMode">Mode test (seuils en secondes)</label>
+  </div>
+  <div class="checkline">
+    <input type="checkbox" id="debug">
+    <label for="debug">Logs console détaillés</label>
+  </div>
+
+  <div class="actions">
+    <button class="primary" id="save">Enregistrer</button>
+    <button id="test">Tester</button>
+  </div>
+  <div id="msg"></div>
+
+  <div class="hint">Raccourci : Ctrl+Shift+A</div>
+
+  <script src="parser.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
