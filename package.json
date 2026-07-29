@@ -4,6 +4,6 @@
   "description": "Extension Firefox : prévient avant de perdre son logtime à 3h59",
   "private": true,
   "scripts": {
-    "build": "rm -rf web-ext-artifacts && mkdir -p web-ext-artifacts && zip -q -r web-ext-artifacts/42-attendance-reminder.zip manifest.json background.js content.js parser.js popup.html popup.js icon-16.svg icon-48.svg icon-96.svg icon-128.svg && echo 'web-ext-artifacts/42-attendance-reminder.zip prêt'"
+    "build": "rm -rf web-ext-artifacts && mkdir -p web-ext-artifacts && zip -q -r web-ext-artifacts/42-attendance-reminder.zip manifest.json background.js content.js parser.js popup.html popup.js icon-16.png icon-48.png icon-96.png icon-128.png && echo 'web-ext-artifacts/42-attendance-reminder.zip prêt'"
   }
 }

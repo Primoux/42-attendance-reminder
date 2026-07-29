@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "42 Attendance Reminder",
-  "version": "1.0",
+  "version": "1.0.0",
   "description": "Notifie quand tu as badgé depuis trop longtemps (logtime lost à 3h59)",
   "browser_specific_settings": {
     "gecko": {
@@ -10,10 +10,10 @@
     }
   },
   "icons": {
-    "16": "icon-16.svg",
-    "48": "icon-48.svg",
-    "96": "icon-96.svg",
-    "128": "icon-128.svg"
+    "16": "icon-16.png",
+    "48": "icon-48.png",
+    "96": "icon-96.png",
+    "128": "icon-128.png"
   },
   "permissions": [
     "notifications",
@@ -39,10 +39,10 @@
     "default_popup": "popup.html",
     "default_title": "42 Reminder",
     "default_icon": {
-      "16": "icon-16.svg",
-      "48": "icon-48.svg",
-      "96": "icon-96.svg",
-      "128": "icon-128.svg"
+      "16": "icon-16.png",
+      "48": "icon-48.png",
+      "96": "icon-96.png",
+      "128": "icon-128.png"
     }
   },
   "background": {

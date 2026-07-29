@@ -91,6 +91,16 @@ Le zip est fabriqué avec `zip(1)` et liste explicitement les fichiers
 empaquetés : aucun fichier parasite ne part sur AMO. Ajouter un fichier au
 paquet demande de compléter la liste dans `package.json`.
 
+Les icônes empaquetées sont les `.png` : AMO veut du bitmap pour la fiche du
+module. Les `.svg` restent la source ; après les avoir modifiées, régénère :
+
+```sh
+python3 -c "import cairosvg
+for s in (16, 48, 96, 128):
+    cairosvg.svg2png(url=f'icon-{s}.svg', write_to=f'icon-{s}.png',
+                     output_width=s, output_height=s)"
+```
+
 `web-ext` n'est pas utilisé : il exige Node >= 16 et ne suffit pas au
 rechargement automatique ici. Pour tester en local, charge le dossier via
 `about:debugging` → « Charger un module temporaire ».
@@ -115,7 +125,8 @@ rechargement automatique ici. Pour tester en local, charge le dossier via
 | `content.js` | observation du DOM attendance |
 | `background.js` | état des sessions, notifications, historique |
 | `popup.html` / `popup.js` | UI (thème clair/sombre auto) |
-| `icon-*.svg` | icônes 16/48/96/128 (chronomètre + pastille d'alerte) |
+| `icon-*.png` | icônes 16/48/96/128 empaquetées (chronomètre + pastille d'alerte) |
+| `icon-*.svg` | sources vectorielles des icônes, non empaquetées |
 
 ## Notes
 
