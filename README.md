@@ -3,7 +3,7 @@
 Extension Firefox qui te prévient **avant** que ta session d'attendance expire et
 que tu perdes ton logtime.
 
-Cible `attendance.42lyon.fr` (et `*.intra.42.fr` en secours).
+Cible `attendance.42lyon.fr`.
 
 ## Installation
 
@@ -119,7 +119,7 @@ rechargement automatique ici. Pour tester en local, charge le dossier via
 
 ## Notes
 
-- Uniquement sur `attendance.42lyon.fr` et `*.intra.42.fr`, aucune donnée ne sort
+- Uniquement sur `attendance.42lyon.fr`, aucune donnée ne sort
   du navigateur. Autre campus : ajoute son domaine dans `manifest.json`
   (`host_permissions` **et** `content_scripts[0].matches`).
 - Vanilla JS, aucune dépendance.

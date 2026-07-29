@@ -52,10 +52,10 @@ function renderStatus(info) {
     statusNode.textContent = info.lastStatus === STATUS.OFF_SITE
       ? 'Pas badgé (ou session terminée).'
       : 'Aucune session détectée.';
-    el('openIntra').hidden = false;
+    el('openAttendance').hidden = false;
     return;
   }
-  el('openIntra').hidden = true;
+  el('openAttendance').hidden = true;
 
   const remaining = info.remainingSeconds;
   el('logtimeInfo').textContent = `expire à ${formatClock(info.expiryMs)}`;
@@ -108,9 +108,9 @@ el('save').addEventListener('click', async () => {
   refresh(false);
 });
 
-el('openIntra').addEventListener('click', async () => {
+el('openAttendance').addEventListener('click', async () => {
   try {
-    await api.runtime.sendMessage({ action: 'openIntra' });
+    await api.runtime.sendMessage({ action: 'openAttendance' });
     window.close();
   } catch (err) {
     showMessage('❌ Ouverture impossible', true);

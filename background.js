@@ -123,13 +123,13 @@ async function evaluate(now, settings, preloadedState) {
 }
 
 /**
- * Ouvre l'intra. Si un onglet intra existe déjà, on l'active *et on le
- * recharge* : après un rechargement de l'extension, les onglets déjà ouverts
- * n'ont plus de content script et ne rapportent donc plus rien.
+ * Ouvre l'attendance. Si un onglet attendance existe déjà, on l'active *et
+ * on le recharge* : après un rechargement de l'extension, les onglets déjà
+ * ouverts n'ont plus de content script et ne rapportent donc plus rien.
  */
 const ATTENDANCE_URL = 'https://attendance.42lyon.fr/me';
 
-async function openIntra() {
+async function openAttendance() {
   try {
     const tabs = await api.tabs.query({ url: '*://attendance.42lyon.fr/*' });
     if (tabs && tabs.length) {
@@ -171,15 +171,15 @@ api.runtime.onMessage.addListener((message) => {
         };
       })();
 
-    case 'openIntra':
-      return openIntra();
+    case 'openAttendance':
+      return openAttendance();
 
     default:
       return undefined;
   }
 });
 
-// Filet de sécurité : même sans onglet intra actif, on continue de compter.
+// Filet de sécurité : même sans onglet attendance actif, on continue de compter.
 api.alarms.create(ALARM_NAME, { periodInMinutes: 1 });
 api.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === ALARM_NAME) {
@@ -188,7 +188,8 @@ api.alarms.onAlarm.addListener((alarm) => {
 });
 
 api.notifications.onClicked.addListener(() => {
-  openIntra().catch((err) => console.warn('[42 Reminder/bg] openIntra:', err));
+  openAttendance().catch((err) =>
+    console.warn('[42 Reminder/bg] openAttendance:', err));
   api.notifications.clear(NOTIFICATION_ID).catch(() => {});
 });
 

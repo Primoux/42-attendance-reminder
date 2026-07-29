@@ -1,5 +1,6 @@
 /*
- * content.js - observe la page intra et rapporte l'état de badge au background.
+ * content.js - observe la page attendance et rapporte l'état de badge au
+ * background.
  * Aucune décision de notification ici : le background est seul maître (l'état
  * doit survivre aux rechargements de page et aux onglets multiples).
  */
@@ -104,7 +105,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') tick('visible');
 });
 
-// L'intra recharge des morceaux de page en ajax : on réagit aux mutations
+// La page attendance recharge des morceaux en ajax : on réagit aux mutations
 // plutôt que d'attendre le prochain tick.
 try {
   new MutationObserver(scheduleFromMutation).observe(document.documentElement, {

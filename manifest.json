@@ -21,13 +21,11 @@
     "alarms"
   ],
   "host_permissions": [
-    "*://*.intra.42.fr/*",
     "*://attendance.42lyon.fr/*"
   ],
   "content_scripts": [
     {
       "matches": [
-        "*://*.intra.42.fr/*",
         "*://attendance.42lyon.fr/*"
       ],
       "js": [
