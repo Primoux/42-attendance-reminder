@@ -1,13 +1,12 @@
 const api = typeof browser !== 'undefined' ? browser : chrome;
 
 const el = (id) => document.getElementById(id);
-const fields = {
-  minutes: el('minutes'), repeat: el('repeat'),
-  seconds: el('seconds'), secondsRow: el('secondsRow'),
-  testMode: el('testMode'), debug: el('debug')
-};
+const fields = { minutes: el('minutes'), repeat: el('repeat') };
 
 let refreshTimer = null;
+// Les réglages sans champ dans le popup (debug, testMode) ne doivent pas être
+// écrasés à l'enregistrement : storage.local.set remplace l'objet entier.
+let currentSettings = null;
 
 function showMessage(text, isError) {
   const msg = el('msg');
@@ -17,42 +16,24 @@ function showMessage(text, isError) {
 }
 
 function applySettings(settings) {
-  const total = settings.warnBeforeSeconds;
-  fields.minutes.value = Math.max(1, Math.round(total / 60));
+  currentSettings = settings;
+  fields.minutes.value = Math.max(1, Math.round(settings.warnBeforeSeconds / 60));
   fields.repeat.value = Math.round(settings.repeatSeconds / 60);
-  fields.seconds.value = total;
-  fields.testMode.checked = Boolean(settings.testMode);
-  fields.debug.checked = Boolean(settings.debug);
-  fields.secondsRow.style.display = settings.testMode ? '' : 'none';
 }
 
-/**
- * Préavis saisi, en secondes. Le champ "secondes" du mode test ne prime que
- * s'il est réellement renseigné : vide, il valait 0 et retombait sur le
- * minimum (5 s), écrasant silencieusement le champ minutes.
- */
-function readWarnBeforeSeconds(testMode) {
-  if (testMode) {
-    const seconds = Number(fields.seconds.value);
-    if (fields.seconds.value !== '' && Number.isFinite(seconds) && seconds >= 1) return seconds;
-  }
+/** Un champ vide ne vaut pas 0 : on garde la valeur par défaut. */
+function readSettings(previous) {
   const minutes = Number(fields.minutes.value);
-  if (fields.minutes.value !== '' && Number.isFinite(minutes) && minutes > 0) return minutes * 60;
-  return DEFAULT_SETTINGS.warnBeforeSeconds;
-}
-
-function readSettings() {
-  const testMode = fields.testMode.checked;
-  const raw = readWarnBeforeSeconds(testMode);
-  const warnBeforeSeconds = clampWarnBefore(raw, testMode);
+  const raw = fields.minutes.value !== '' && Number.isFinite(minutes) && minutes > 0
+    ? minutes * 60
+    : DEFAULT_SETTINGS.warnBeforeSeconds;
+  const warnBeforeSeconds = clampWarnBefore(raw, false);
   const repeatMinutes = Math.min(Math.max(Number(fields.repeat.value) || 15, 1), 120);
-  return {
+  return Object.assign({}, previous, {
     warnBeforeSeconds,
-    repeatSeconds: testMode ? Math.min(repeatMinutes * 60, warnBeforeSeconds) : repeatMinutes * 60,
-    testMode,
-    debug: fields.debug.checked,
+    repeatSeconds: repeatMinutes * 60,
     _clamped: warnBeforeSeconds !== raw
-  };
+  });
 }
 
 function renderStatus(info) {
@@ -103,6 +84,7 @@ async function refresh(applyInputs) {
   try {
     const info = await api.runtime.sendMessage({ action: 'getStatus' });
     if (!info) return;
+    currentSettings = info.settings;
     if (applyInputs) applySettings(info.settings);
     renderStatus(info);
   } catch (err) {
@@ -115,7 +97,7 @@ async function refresh(applyInputs) {
 }
 
 el('save').addEventListener('click', async () => {
-  const settings = readSettings();
+  const settings = readSettings(currentSettings);
   const clamped = settings._clamped;
   delete settings._clamped;
   await api.storage.local.set({ settings });
@@ -126,15 +108,6 @@ el('save').addEventListener('click', async () => {
   refresh(false);
 });
 
-el('test').addEventListener('click', async () => {
-  try {
-    await api.runtime.sendMessage({ action: 'testNotification' });
-    showMessage('✅ Notification envoyée');
-  } catch (err) {
-    showMessage('❌ Notifications bloquées', true);
-  }
-});
-
 el('openIntra').addEventListener('click', async () => {
   try {
     await api.runtime.sendMessage({ action: 'openIntra' });
@@ -142,19 +115,6 @@ el('openIntra').addEventListener('click', async () => {
   } catch (err) {
     showMessage('❌ Ouverture impossible', true);
     console.warn('[42 Reminder/popup]', err);
-  }
-});
-
-fields.testMode.addEventListener('change', () => {
-  fields.secondsRow.style.display = fields.testMode.checked ? '' : 'none';
-  if (fields.testMode.checked) fields.seconds.value = readWarnBeforeSeconds(false);
-});
-
-// Tant que l'utilisateur édite les minutes, le champ secondes suit : sinon les
-// deux champs divergent et c'est le moins visible des deux qui gagne.
-fields.minutes.addEventListener('input', () => {
-  if (fields.testMode.checked && fields.minutes.value !== '') {
-    fields.seconds.value = Number(fields.minutes.value) * 60;
   }
 });
 

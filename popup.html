@@ -70,10 +70,6 @@
       background: var(--field); color: var(--fg);
       border: 1px solid var(--border); border-radius: 4px; font-size: 13px;
     }
-    input[type="checkbox"] { accent-color: var(--accent); }
-    .checkline { display: flex; align-items: center; gap: 8px; margin-top: 8px; color: var(--muted); }
-    .checkline label { cursor: pointer; }
-
     button {
       border: 1px solid var(--border); border-radius: 4px; cursor: pointer;
       padding: 7px 10px; font-size: 13px; background: var(--card); color: var(--fg);
@@ -108,23 +104,8 @@
     <label for="repeat">Relancer toutes les</label>
     <input type="number" id="repeat" min="1" max="120" step="1"> <span>min</span>
   </div>
-  <div class="row" id="secondsRow" style="margin-top:6px; display:none">
-    <label for="seconds">Préavis exact (secondes)</label>
-    <input type="number" id="seconds" min="5" step="1" style="width:80px">
-  </div>
-
-  <div class="checkline">
-    <input type="checkbox" id="testMode">
-    <label for="testMode">Mode test (seuils en secondes)</label>
-  </div>
-  <div class="checkline">
-    <input type="checkbox" id="debug">
-    <label for="debug">Logs console détaillés</label>
-  </div>
-
   <div class="actions">
     <button class="primary" id="save">Enregistrer</button>
-    <button id="test">Tester</button>
   </div>
   <div id="msg"></div>
 

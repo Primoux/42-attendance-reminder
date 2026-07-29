@@ -61,10 +61,19 @@ Clique sur l'icône de l'extension.
 
 - **Prévenir avant l'échéance** : préavis en minutes (défaut 30).
 - **Relancer toutes les** : intervalle des rappels.
-- **Mode test** : débloque la saisie du préavis en secondes (min 5 s) pour
-  vérifier que la chaîne complète marche sans attendre des heures.
-- **Logs console détaillés** : trace chaque tick dans la console de la page
-  attendance et dans celle du background.
+
+Deux réglages n'ont pas de champ dans le popup et se posent depuis la console
+du background (`about:debugging` → Inspecter) :
+
+```js
+browser.storage.local.get('settings').then(({ settings }) =>
+  browser.storage.local.set({ settings: { ...settings, debug: true } }));
+```
+
+- `debug` : trace chaque tick dans la console de la page attendance et du
+  background.
+- `testMode` : autorise un `warnBeforeSeconds` descendant à 5 s, pour vérifier
+  la chaîne de notification sans attendre des heures.
 
 Le préavis est borné à 1 min minimum : impossible de configurer une alerte qui
 arrive trop tard.
