@@ -71,20 +71,14 @@ arrive trop tard.
 
 ## Développement
 
+Le code de la branche `main` est celui qui part sur AMO : pas de tests, pas
+d'outillage. Le développement et les tests vivent sur la branche `dev`.
+
 ```sh
 npm install -g web-ext
 npm run dev      # Firefox dédié, rechargement auto à chaque sauvegarde
 npm run build    # génère le .zip à envoyer sur addons.mozilla.org
-npm test
 ```
-
-- `test/parser.test.js` : détection DOM et logique de notification, sur un faux
-  DOM minimal (`test/fakedom.js`).
-- `test/background.test.js` : charge `parser.js` + `background.js` dans un faux
-  `browser` (promesses, comme Firefox) et exerce la machine à états — création
-  de session, anti-spam, badge out, rebadge, `getStatus`, `resetStats`.
-
-Micro-runner maison (`test/tiny.js`), zéro dépendance, marche depuis Node 12.
 
 ## Fichiers
 
@@ -96,7 +90,6 @@ Micro-runner maison (`test/tiny.js`), zéro dépendance, marche depuis Node 12.
 | `background.js` | état des sessions, notifications, historique |
 | `popup.html` / `popup.js` | UI (thème clair/sombre auto) |
 | `icon-*.svg` | icônes 16/48/96/128 (chronomètre + pastille d'alerte) |
-| `test/` | tests |
 
 ## Notes
 
