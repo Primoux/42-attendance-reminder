@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "42 Attendance Reminder",
-  "version": "2.0",
+  "version": "1.0",
   "description": "Notifie quand tu as badgé depuis trop longtemps (logtime lost à 3h59)",
   "browser_specific_settings": {
     "gecko": {

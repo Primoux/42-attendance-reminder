@@ -1,6 +1,6 @@
 {
   "name": "42-attendance-reminder",
-  "version": "2.0.0",
+  "version": "1.0.0",
   "description": "Extension Firefox : prévient avant de perdre son logtime à 3h59",
   "private": true,
   "scripts": {
