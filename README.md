@@ -57,10 +57,7 @@ en cours et son heure de début sont conservées.
 
 ## Configuration
 
-Icône de l'extension, ou **Ctrl+Shift+A**.
-
-> Ce raccourci est aussi celui du gestionnaire d'add-ons de Firefox. S'il ne
-> répond pas, change-le dans `about:addons` → engrenage → "Gérer les raccourcis".
+Clique sur l'icône de l'extension.
 
 - **Prévenir avant l'échéance** : préavis en minutes (défaut 30).
 - **Relancer toutes les** : intervalle des rappels.

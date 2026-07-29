@@ -40,13 +40,5 @@
       "parser.js",
       "background.js"
     ]
-  },
-  "commands": {
-    "_execute_action": {
-      "suggested_key": {
-        "default": "Ctrl+Shift+A"
-      },
-      "description": "Ouvrir 42 Reminder"
-    }
   }
 }
