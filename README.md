@@ -77,8 +77,20 @@ d'outillage. Le développement et les tests vivent sur la branche `dev`.
 ```sh
 npm install -g web-ext
 npm run dev      # Firefox dédié, rechargement auto à chaque sauvegarde
-npm run build    # génère le .zip à envoyer sur addons.mozilla.org
+npm run build    # .zip non signé
+npm run sign     # .xpi signé par Mozilla (auto-distribution)
 ```
+
+`npm run sign` a besoin de clés d'API AMO, à passer par l'environnement et
+**jamais** à committer :
+
+```sh
+export WEB_EXT_API_KEY=user:12345678:123
+export WEB_EXT_API_SECRET=...
+```
+
+Chaque envoi exige un numéro de version inédit : incrémente `version` dans
+`manifest.json` avant de signer.
 
 ## Fichiers
 
