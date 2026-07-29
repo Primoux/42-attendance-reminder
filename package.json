@@ -5,8 +5,6 @@
   "private": true,
   "scripts": {
     "test": "node test/parser.test.js && node test/background.test.js",
-    "dev": "npx --yes web-ext run",
-    "build": "npx --yes web-ext build --overwrite-dest",
-    "sign": "npx --yes web-ext sign --channel=unlisted"
+    "build": "rm -rf web-ext-artifacts && mkdir -p web-ext-artifacts && zip -q -r web-ext-artifacts/42-attendance-reminder.zip manifest.json background.js content.js parser.js popup.html popup.js icon-16.svg icon-48.svg icon-96.svg icon-128.svg && echo 'web-ext-artifacts/42-attendance-reminder.zip prêt'"
   }
 }
