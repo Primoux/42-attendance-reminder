@@ -34,6 +34,7 @@ function makeFakeBrowser() {
       onChanged: { addListener() {} }
     },
     runtime: {
+      getURL: (path) => `moz-extension://test/${path}`,
       onMessage: { addListener(fn) { captured.listeners.message = fn; } },
       onInstalled: { addListener(fn) { captured.listeners.installed = fn; } }
     },
@@ -76,6 +77,15 @@ test('background.js se charge sans exception et enregistre ses listeners', () =>
   assert.ok(fake._captured.listeners.message, 'listener runtime.onMessage manquant');
   assert.ok(fake._captured.listeners.alarm, 'listener alarms.onAlarm manquant');
   assert.strictEqual(fake._captured.alarms.length, 1, 'alarme périodique non créée');
+});
+
+test('les notifications utilisent l\'icône empaquetée', async () => {
+  const fake = makeFakeBrowser();
+  loadBackground(fake);
+  await fake._captured.listeners.message({ action: 'testNotification' });
+  const notif = fake._captured.notifications[0];
+  assert.ok(notif, 'aucune notification créée');
+  assert.strictEqual(notif.iconUrl, 'moz-extension://test/icon-48.svg');
 });
 
 test('getStatus répond au popup', async () => {

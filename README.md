@@ -101,6 +101,7 @@ Micro-runner maison (`test/tiny.js`), zéro dépendance, marche depuis Node 12.
 | `content.js` | observation du DOM attendance |
 | `background.js` | état des sessions, notifications, historique |
 | `popup.html` / `popup.js` | UI (thème clair/sombre auto) |
+| `icon-*.svg` | icônes 16/48/96/128 (chronomètre + pastille d'alerte) |
 | `test/` | tests |
 
 ## Notes

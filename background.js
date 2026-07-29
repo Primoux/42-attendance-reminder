@@ -9,10 +9,7 @@ const api = typeof browser !== 'undefined' ? browser : chrome;
 const ALARM_NAME = '42-reminder-tick';
 const HISTORY_MAX = 50;
 const NOTIFICATION_ID = '42-reminder';
-const ICON_URL =
-  'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">' +
-  '<circle cx="50" cy="50" r="45" fill="%23FF6B6B"/>' +
-  '<text x="50" y="68" font-size="52" font-weight="bold" text-anchor="middle" fill="white">!</text></svg>';
+const ICON_URL = api.runtime.getURL('icon-48.svg');
 
 const EMPTY_STATE = {
   session: null,   // { startMs, status, lastSeenMs, notifiedCount, lastNotifiedMs, alerted }
