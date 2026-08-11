@@ -10,7 +10,7 @@ const api = typeof browser !== 'undefined' ? browser : chrome;
 const TICK_MS = 15000;
 const MUTATION_DEBOUNCE_MS = 1000;
 
-let debug = true;
+let debug = DEFAULT_SETTINGS.debug;
 let lastSignature = null;
 let mutationTimer = null;
 

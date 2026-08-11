@@ -8,7 +8,10 @@ const api = typeof browser !== 'undefined' ? browser : chrome;
 
 const ALARM_NAME = '42-reminder-tick';
 const NOTIFICATION_ID = '42-reminder';
-const ICON_URL = api.runtime.getURL('icon-48.svg');
+// PNG et pas SVG : seuls les PNG sont empaquetés (cf. le script `build`).
+// Firefox n'échoue pas sur une iconUrl absente, il retombe juste sur l'icône
+// par défaut - d'où un SVG manquant passé inaperçu jusqu'en 1.0.0.
+const ICON_URL = api.runtime.getURL('icon-48.png');
 
 const EMPTY_STATE = {
   session: null, // { startMs, expiryMs, status, lastSeenMs, notifiedCount, lastNotifiedMs }
@@ -119,7 +122,7 @@ async function evaluate(now, settings, preloadedState) {
   state.session.notifiedCount = (state.session.notifiedCount || 0) + 1;
   state.session.lastNotifiedMs = now;
   await setState(state);
-  log(s, `notification "${decision.kind}" envoyée (${elapsed})`);
+  log(s, `notification "${decision.kind}" envoyée (reste ${remaining})`);
 }
 
 /**
