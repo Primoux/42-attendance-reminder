@@ -5,6 +5,7 @@
   "private": true,
   "license": "MIT",
   "scripts": {
+    "test": "node test/parser.test.js",
     "build": "rm -rf web-ext-artifacts && mkdir -p web-ext-artifacts && zip -q -r web-ext-artifacts/42-attendance-reminder.zip manifest.json background.js content.js parser.js popup.html popup.js icon-16.png icon-48.png icon-96.png icon-128.png && echo 'web-ext-artifacts/42-attendance-reminder.zip prêt'"
   }
 }
