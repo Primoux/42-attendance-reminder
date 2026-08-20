@@ -3,7 +3,10 @@
 Extension Firefox qui te prévient **avant** que ta session d'attendance expire et
 que tu perdes ton logtime.
 
-Cible `attendance.42lyon.fr`.
+Cible `attendance.42lyon.fr`. attendance est un outil de 42 Lyon pour le campus
+de Lyon : il n'existe pas ailleurs, l'extension n'a donc qu'un seul domaine à
+viser. Il vit dans `ATTENDANCE_HOST` (`parser.js`), d'où découlent l'URL du
+bouton « Ouvrir l'attendance » et le message du popup quand rien n'est détecté.
 
 ## Installation
 
@@ -13,12 +16,20 @@ Depuis [Firefox Add-ons](https://addons.mozilla.org/fr/firefox/) — cherche
 ## Comment ça marche
 
 - `content.js` observe la page attendance (tick toutes les 15 s + MutationObserver sur
-  les rechargements ajax) et rapporte l'état de badge au background.
+  les rechargements ajax) et rapporte l'état de badge au background. Il ne parle
+  au background que si l'état a changé, ou au plus une fois par tick : `detect()`
+  parcourt le DOM trois fois, et la page rafraîchit son compte à rebours toute
+  seule — sans ce filtre, chaque mutation réveillait la page background et
+  écrivait dans `storage.local`.
 - `background.js` est seul à décider des notifications. Tout son état vit dans
   `storage.local` : en MV3 la page background est non-persistante, la mémoire est
   perdue à tout moment.
 - Une alarme d'une minute prend le relais : même sans onglet attendance ouvert, le
-  compteur continue et l'alerte part.
+  compteur continue et l'alerte part. Elle n'est (re)créée que si elle n'existe
+  pas : `alarms.create` remplaçant l'alarme de même nom, la recréer à chaque
+  réveil du background remettrait son compte à zéro et elle ne sonnerait jamais.
+- Le temps restant s'affiche sur l'icône (`action.setBadgeText`), arrondi vers le
+  bas pour ne jamais laisser croire qu'il reste plus de temps qu'en réalité.
 
 ### Détection
 
@@ -49,15 +60,50 @@ effacée — le DOM de la page peut changer, on préfère garder le timer que le
 
 Une seule notification au franchissement du préavis, puis une relance toutes les
 15 min (configurable), et une alerte prioritaire dans les 5 dernières minutes
-(au plus une par minute). L'état de notification est persisté : recharger la
-page ou l'extension ne re-notifie pas.
+(au plus une par minute). Passé l'échéance, une dernière alerte part — au réveil
+après une veille machine, aucune n'a pu être envoyée à temps, et le silence ne
+dirait pas si le logtime est perdu ou s'il n'y avait rien à signaler. L'état de
+notification est persisté : recharger la page ou l'extension ne re-notifie pas.
+
+Une échéance déduite d'un compte à rebours (`03h08m`) n'a que la minute pour
+granularité : elle bouge de quelques secondes d'une lecture à l'autre. Seul un
+écart de plus de deux minutes compte comme un rebadge, sinon le cycle d'alerte
+repartirait de zéro à chaque tick.
+
+Si le système refuse la notification, l'erreur est stockée et affichée dans le
+popup : sans ça, l'extension a l'air de tourner et n'alerte jamais.
 
 Rebadger repousse l'échéance : le cycle d'alerte repart à zéro, mais la présence
 en cours et son heure de début sont conservées.
 
+Une session dont l'échéance est passée est effacée, sans qu'aucun onglet n'ait à
+être ouvert : l'alarme s'en charge. C'est nécessaire, sinon elle traîne dans
+`storage.local` et le badge du lendemain se fusionnerait avec elle, affichant
+l'heure de début de la veille. Symétriquement, une échéance déjà passée à la
+découverte n'ouvre pas de session : il n'y a plus rien à surveiller, et l'ouvrir
+pour la purger aussitôt ferait recréer-notifier-effacer à chaque tick.
+(`isSessionOver` sait aussi conclure sans échéance, à partir de `lastSeenMs` :
+plus que défensif aujourd'hui, pour de l'état écrit par une version antérieure.)
+
 ## Configuration
 
 Clique sur l'icône de l'extension.
+
+## Développement
+
+```sh
+npm test    # parser.js, background.js, et manifest/package.json en phase
+npm run lint    # web-ext lint, avant toute soumission AMO
+npm run build   # web-ext-artifacts/42-attendance-reminder.zip
+```
+
+`version` est dupliqué entre `manifest.json` et `package.json` : `version:check`
+casse le test et le build si les deux divergent.
+
+`test/background.test.js` charge `parser.js` puis `background.js` dans un `vm`
+avec un faux `browser` (`test/fake-api.js`), comme Firefox charge les deux
+scripts dans la même page. C'est là que se testent les scénarios qui n'ont
+aucun DOM : onglet fermé, réveil après veille, badge du lendemain, rebadge.
 
 - **Prévenir avant l'échéance** : préavis en minutes (défaut 30).
 - **Relancer toutes les** : intervalle des rappels.

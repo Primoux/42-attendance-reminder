@@ -15,7 +15,10 @@ const ICON_URL = api.runtime.getURL('icon-48.png');
 
 const EMPTY_STATE = {
   session: null, // { startMs, expiryMs, status, lastSeenMs, notifiedCount, lastNotifiedMs }
-  lastStatus: STATUS.UNKNOWN
+  lastStatus: STATUS.UNKNOWN,
+  // Dernier échec de notification, remonté au popup : sans ça une extension qui
+  // n'a plus le droit de notifier a l'air de fonctionner parfaitement.
+  notifyError: null // { message, at }
 };
 
 async function getSettings() {
@@ -36,6 +39,25 @@ function log(settings, ...args) {
   if (settings.debug) console.log('[42 Reminder/bg]', ...args);
 }
 
+/** `notifications.clear` ne renvoie pas toujours une promesse selon le moteur. */
+async function clearNotification() {
+  try {
+    await api.notifications.clear(NOTIFICATION_ID);
+  } catch (err) {
+    /* rien à nettoyer */
+  }
+}
+
+/**
+ * Efface la session. Ne touche pas à la notification affichée : après une
+ * alerte d'échéance dépassée, c'est justement elle qu'on veut laisser à l'écran.
+ */
+async function endSession(state, settings, reason) {
+  log(settings, 'session terminée :', reason);
+  state.session = null;
+  await setState(state);
+}
+
 async function handleBadgeState(message) {
   const settings = await getSettings();
   const state = await getState();
@@ -43,9 +65,11 @@ async function handleBadgeState(message) {
   const now = message.at || Date.now();
 
   if (isOnSite(incoming.status) && (incoming.startMs || incoming.expiryMs)) {
-    const current = state.session;
+    // Une session finie ne doit pas absorber le badge suivant : on garderait
+    // son startMs et le popup afficherait la présence de la veille.
+    const current = isSessionOver(state.session, now) ? null : state.session;
     if (!current) {
-      state.session = {
+      const fresh = {
         startMs: incoming.startMs || null,
         expiryMs: incoming.expiryMs || null,
         status: incoming.status,
@@ -53,11 +77,26 @@ async function handleBadgeState(message) {
         notifiedCount: 0,
         lastNotifiedMs: 0
       };
-      log(settings, 'nouvelle session, échéance', formatClock(sessionExpiry(state.session)));
+      // La page peut annoncer une échéance déjà passée (badgé depuis plus de 4 h
+      // sans rebadger). Ouvrir une session pour la purger dans la foulée ferait
+      // recréer-notifier-effacer à chaque tick du content script, soit toutes
+      // les 15 s : on n'ouvre que ce qu'il y a encore à surveiller.
+      if (isSessionOver(fresh, now)) {
+        log(settings, 'échéance déjà passée à la découverte, aucune session ouverte');
+      } else {
+        state.session = fresh;
+        log(settings, 'nouvelle session, échéance', formatClock(sessionExpiry(fresh)));
+        // l'alerte de la session précédente ne concerne plus celle-ci
+        await clearNotification();
+      }
     } else {
       // Rebadger repousse l'échéance : c'est un nouveau cycle d'alerte, mais la
       // même présence — on garde le début le plus ancien et l'historique.
-      if (incoming.expiryMs && incoming.expiryMs !== current.expiryMs) {
+      // La comparaison tolère le bruit : une échéance déduite d'un compte à
+      // rebours bouge de quelques secondes à chaque lecture, et la prendre pour
+      // un rebadge remettrait `notifiedCount` à zéro toutes les 15 s — donc une
+      // notification « threshold » toutes les 15 s dans la fenêtre d'alerte.
+      if (isNewDeadline(current.expiryMs, incoming.expiryMs)) {
         log(settings, 'échéance repoussée à', formatClock(incoming.expiryMs));
         current.expiryMs = incoming.expiryMs;
         current.notifiedCount = 0;
@@ -71,9 +110,8 @@ async function handleBadgeState(message) {
     }
   } else if (incoming.status === STATUS.OFF_SITE) {
     if (state.session) {
-      log(settings, 'badge out détecté, session terminée');
-      state.session = null;
-      await api.notifications.clear(NOTIFICATION_ID).catch(() => {});
+      await endSession(state, settings, 'badge out détecté');
+      await clearNotification();
     }
   }
   // STATUS.UNKNOWN : la page ne dit rien (mauvaise page, DOM changé) -> on garde
@@ -84,13 +122,54 @@ async function handleBadgeState(message) {
   await evaluate(now, settings, state);
 }
 
+/**
+ * Temps restant sur l'icône : la seule info visible sans ouvrir le popup ni
+ * attendre une notification. Rafraîchi à chaque réveil du background, donc au
+ * moins une fois par minute grâce à l'alarme.
+ */
+async function renderBadge(state, now, settings) {
+  const action = api.action || api.browserAction;
+  if (!action || typeof action.setBadgeText !== 'function') return;
+  const expiry = sessionExpiry(state.session);
+  const remaining = expiry ? Math.round((expiry - now) / 1000) : 0;
+  const text = badgeText(remaining);
+  try {
+    await action.setBadgeText({ text });
+    if (text && typeof action.setBadgeBackgroundColor === 'function') {
+      await action.setBadgeBackgroundColor({
+        color: badgeColor(remaining, settings.warnBeforeSeconds)
+      });
+    }
+  } catch (err) {
+    console.warn('[42 Reminder/bg] badge impossible:', err);
+  }
+}
+
 async function evaluate(now, settings, preloadedState) {
   const s = settings || (await getSettings());
   const state = preloadedState || (await getState());
+  try {
+    await evaluateSession(now, s, state);
+  } finally {
+    // même si la décision a échoué, l'icône ne doit pas rester sur une valeur
+    // périmée : c'est ce que l'utilisateur voit en permanence
+    await renderBadge(state, now, s);
+  }
+}
+
+async function evaluateSession(now, s, state) {
   if (!state.session) return;
 
+  // Sans onglet attendance ouvert, l'alarme est le seul à pouvoir constater la
+  // fin : personne ne viendra nous dire que la session est morte. On décide
+  // avant de purger, sinon la dernière alerte serait avalée par le nettoyage.
+  const over = isSessionOver(state.session, now);
   const decision = decideNotification(state.session, s, now);
-  if (!decision.notify) return;
+
+  if (!decision.notify) {
+    if (over) await endSession(state, s, 'échéance passée');
+    return;
+  }
 
   const remaining = formatDuration(decision.remainingSeconds);
   const expiresAt = formatClock(sessionExpiry(state.session));
@@ -100,7 +179,10 @@ async function evaluate(now, settings, preloadedState) {
 
   let title = '⏰ Rebadge bientôt';
   let body = `Logtime lost dans ${remaining}, à ${expiresAt}.${presence}`;
-  if (decision.kind === 'logtime_lost_soon') {
+  if (decision.kind === 'expired') {
+    title = '💀 Logtime perdu';
+    body = `L'échéance de ${expiresAt} est passée. Rebadge pour repartir.`;
+  } else if (decision.kind === 'logtime_lost_soon') {
     title = '🚨 Logtime lost imminent !';
     body = `Plus que ${remaining} avant ${expiresAt}.${presence}`;
   } else if (decision.kind === 'repeat') {
@@ -114,15 +196,23 @@ async function evaluate(now, settings, preloadedState) {
       title,
       message: body
     });
+    state.notifyError = null;
   } catch (err) {
     console.warn('[42 Reminder/bg] notification impossible:', err);
+    state.notifyError = { message: (err && err.message) || String(err), at: now };
+    await setState(state);
     return;
   }
 
   state.session.notifiedCount = (state.session.notifiedCount || 0) + 1;
   state.session.lastNotifiedMs = now;
+  if (decision.kind === 'expired') state.session.expiredNotified = true;
   await setState(state);
   log(s, `notification "${decision.kind}" envoyée (reste ${remaining})`);
+
+  // La session finie n'est purgée qu'ici : sa dernière alerte est partie, et on
+  // laisse volontairement la notification affichée à l'écran.
+  if (over) await endSession(state, s, 'échéance passée, dernière alerte envoyée');
 }
 
 /**
@@ -130,11 +220,11 @@ async function evaluate(now, settings, preloadedState) {
  * on le recharge* : après un rechargement de l'extension, les onglets déjà
  * ouverts n'ont plus de content script et ne rapportent donc plus rien.
  */
-const ATTENDANCE_URL = 'https://attendance.42lyon.fr/me';
+const ATTENDANCE_URL = `https://${ATTENDANCE_HOST}/me`;
 
 async function openAttendance() {
   try {
-    const tabs = await api.tabs.query({ url: '*://attendance.42lyon.fr/*' });
+    const tabs = await api.tabs.query({ url: `*://${ATTENDANCE_HOST}/*` });
     if (tabs && tabs.length) {
       await api.tabs.update(tabs[0].id, { active: true });
       await api.tabs.reload(tabs[0].id);
@@ -160,15 +250,19 @@ api.runtime.onMessage.addListener((message) => {
       return (async () => {
         const [settings, state] = await Promise.all([getSettings(), getState()]);
         const now = Date.now();
-        const expiryMs = sessionExpiry(state.session);
+        // Le popup peut s'ouvrir avant le tick d'alarme qui purgera la session
+        // finie : ne pas l'afficher comme si elle courait encore.
+        const session = isSessionOver(state.session, now) ? null : state.session;
+        const expiryMs = sessionExpiry(session);
         return {
           settings,
-          session: state.session,
+          session,
           lastStatus: state.lastStatus,
+          notifyError: state.notifyError || null,
           expiryMs,
           remainingSeconds: expiryMs ? Math.round((expiryMs - now) / 1000) : null,
-          elapsedSeconds: state.session && state.session.startMs
-            ? Math.floor((now - state.session.startMs) / 1000)
+          elapsedSeconds: session && session.startMs
+            ? Math.floor((now - session.startMs) / 1000)
             : null,
           sessionMaxSeconds: SESSION_MAX_SECONDS
         };
@@ -183,7 +277,32 @@ api.runtime.onMessage.addListener((message) => {
 });
 
 // Filet de sécurité : même sans onglet attendance actif, on continue de compter.
-api.alarms.create(ALARM_NAME, { periodInMinutes: 1 });
+// Ce top-level rejoue à chaque réveil de la page background (donc à chaque
+// message du content script, soit toutes les 15 s) et `alarms.create` remplace
+// l'alarme de même nom : la recréer à l'aveugle remettrait le compte à une
+// minute à zéro sans arrêt, et l'alarme ne sonnerait jamais.
+/**
+ * `alarms.get` renvoie une promesse sur `browser.*` mais rien du tout sur un
+ * moteur à callbacks : `await` donnerait alors `undefined` sans lever, et on
+ * recréerait l'alarme à chaque réveil — précisément le bug qu'on évite ici.
+ */
+function getAlarm(name) {
+  const maybe = api.alarms.get(name);
+  if (maybe && typeof maybe.then === 'function') return maybe;
+  return new Promise((resolve) => api.alarms.get(name, resolve));
+}
+
+async function ensureAlarm() {
+  try {
+    if (await getAlarm(ALARM_NAME)) return;
+  } catch (err) {
+    // alarms.get indisponible : mieux vaut une alarme recréée que pas d'alarme
+  }
+  api.alarms.create(ALARM_NAME, { periodInMinutes: 1 });
+}
+
+ensureAlarm().catch((err) => console.warn('[42 Reminder/bg] ensureAlarm:', err));
+
 api.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === ALARM_NAME) {
     evaluate(Date.now()).catch((err) => console.warn('[42 Reminder/bg] alarm:', err));
@@ -193,7 +312,7 @@ api.alarms.onAlarm.addListener((alarm) => {
 api.notifications.onClicked.addListener(() => {
   openAttendance().catch((err) =>
     console.warn('[42 Reminder/bg] openAttendance:', err));
-  api.notifications.clear(NOTIFICATION_ID).catch(() => {});
+  clearNotification();
 });
 
 api.runtime.onInstalled.addListener(async () => {

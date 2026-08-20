@@ -36,6 +36,19 @@ function readSettings(previous) {
   });
 }
 
+/** Une notification refusée (notifications coupées au niveau de l'OS, par
+ * exemple) ne se voit nulle part ailleurs que dans la console du background. */
+function renderNotifyError(notifyError) {
+  const node = el('notifyError');
+  if (!notifyError) {
+    node.hidden = true;
+    node.textContent = '';
+    return;
+  }
+  node.hidden = false;
+  node.textContent = `⚠️ Notification impossible à ${formatClock(notifyError.at)} : ${notifyError.message}`;
+}
+
 function renderStatus(info) {
   const dot = el('dot');
   const bar = el('barFill');
@@ -44,14 +57,20 @@ function renderStatus(info) {
 
   dot.className = 'dot';
   bar.className = '';
+  renderNotifyError(info.notifyError);
 
   if (!info.expiryMs) {
     el('logtimeInfo').textContent = '';
     elapsedNode.textContent = '—';
     bar.style.width = '0';
-    statusNode.textContent = info.lastStatus === STATUS.OFF_SITE
-      ? 'Pas badgé (ou session terminée).'
-      : 'Aucune session détectée.';
+    if (info.lastStatus === STATUS.OFF_SITE) {
+      statusNode.textContent = 'Pas badgé (ou session terminée).';
+    } else if (isOnSite(info.lastStatus)) {
+      // badgé mais plus aucune échéance à surveiller : le logtime est déjà perdu
+      statusNode.textContent = 'Badgé, échéance dépassée. Rebadge pour repartir.';
+    } else {
+      statusNode.textContent = `Aucune session détectée sur ${ATTENDANCE_HOST}.`;
+    }
     el('openAttendance').hidden = false;
     return;
   }
@@ -69,15 +88,15 @@ function renderStatus(info) {
   dot.classList.add(level);
   if (level !== 'on') bar.classList.add(level); // classList.add('') lève une exception
   bar.style.width = `${(consumed * 100).toFixed(1)}%`;
-  elapsedNode.textContent = remaining > 0 ? formatDuration(remaining) : '00s';
+  elapsedNode.textContent = formatDuration(remaining);
 
   const label = info.session && info.session.status === STATUS.ON_SITE_UNSAVED
     ? 'On Site (unsaved)' : 'On Site';
   const since = info.session && info.session.startMs
     ? ` depuis ${formatClock(info.session.startMs)}` : '';
-  statusNode.textContent = remaining > 0
-    ? `${label}${since} · ${formatDuration(remaining)} restantes`
-    : `${label}${since} · échéance dépassée`;
+  // `remaining` est forcément positif ici : le background masque les sessions
+  // dont l'échéance est passée, elles sortent par la branche `!info.expiryMs`.
+  statusNode.textContent = `${label}${since} · ${formatDuration(remaining)} restantes`;
 }
 
 async function refresh(applyInputs) {

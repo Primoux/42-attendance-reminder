@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "42 Attendance Reminder",
   "version": "1.0.1",
-  "description": "Notifie quand tu as badgé depuis trop longtemps (logtime lost à 3h59)",
+  "description": "Campus 42 Lyon : notifie avant de perdre ton logtime (logtime lost à 3h59 de badge)",
   "browser_specific_settings": {
     "gecko": {
       "id": "42-attendance-reminder@enchevri",

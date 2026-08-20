@@ -344,6 +344,31 @@ test('sessionExpiry rend null sans rien d\'exploitable', () => {
   assert.strictEqual(P.sessionExpiry({}), null);
 });
 
+// ------------------------------------------------------------ isNewDeadline
+
+group('isNewDeadline');
+
+test('un rebadge repousse l\'échéance de plusieurs minutes', () => {
+  assert.strictEqual(P.isNewDeadline(at(14, 31), at(16, 0)), true);
+});
+
+test('quelques secondes d\'écart, c\'est le même instant relu', () => {
+  assert.strictEqual(P.isNewDeadline(at(14, 31), at(14, 31, 12)), false);
+  assert.strictEqual(P.isNewDeadline(at(14, 31), at(14, 32, 30)), false);
+});
+
+test('une échéance qui recule franchement compte aussi', () => {
+  assert.strictEqual(P.isNewDeadline(at(16, 0), at(14, 31)), true);
+});
+
+test('pas d\'échéance connue : la première est une nouveauté', () => {
+  assert.strictEqual(P.isNewDeadline(null, at(14, 31)), true);
+});
+
+test('rien n\'arrive : rien ne change', () => {
+  assert.strictEqual(P.isNewDeadline(at(14, 31), null), false);
+});
+
 // --------------------------------------------------- decideNotification
 
 group('decideNotification');
@@ -388,8 +413,20 @@ test('dernière ligne droite : au plus une par minute', () => {
   assert.strictEqual(P.decideNotification(s, SETTINGS, NOW).notify, false);
 });
 
-test('échéance dépassée : plus rien à sauver', () => {
+test('échéance dépassée : une dernière alerte', () => {
   const s = session(-10, { notifiedCount: 3, lastNotifiedMs: 0 });
+  const d = P.decideNotification(s, SETTINGS, NOW);
+  assert.strictEqual(d.notify, true);
+  assert.strictEqual(d.kind, 'expired');
+});
+
+test('échéance dépassée, dernière alerte déjà envoyée : silence', () => {
+  const s = session(-10, { notifiedCount: 4, lastNotifiedMs: NOW, expiredNotified: true });
+  assert.strictEqual(P.decideNotification(s, SETTINGS, NOW).notify, false);
+});
+
+test('échéance dépassée depuis longtemps : toujours une seule alerte', () => {
+  const s = session(-7200, { notifiedCount: 4, expiredNotified: true });
   assert.strictEqual(P.decideNotification(s, SETTINGS, NOW).notify, false);
 });
 
@@ -419,6 +456,39 @@ test('une saisie absurde retombe sur le défaut', () => {
   assert.strictEqual(P.clampWarnBefore(undefined, false), P.DEFAULT_SETTINGS.warnBeforeSeconds);
 });
 
+// ----------------------------------------------------------- fin de session
+
+group('isSessionOver');
+
+test('une session dont l\'échéance est à venir court toujours', () => {
+  assert.strictEqual(P.isSessionOver({ expiryMs: at(14, 31) }, NOW), false);
+});
+
+test('une session dont l\'échéance est passée est finie', () => {
+  assert.strictEqual(P.isSessionOver({ expiryMs: at(11, 59) }, NOW), true);
+});
+
+test('sans expiryMs, l\'échéance se déduit du début (+4h)', () => {
+  assert.strictEqual(P.isSessionOver({ startMs: at(9, 0) }, NOW), false);
+  assert.strictEqual(P.isSessionOver({ startMs: at(7, 30) }, NOW), true);
+});
+
+test('sans échéance, une session confirmée récemment est gardée', () => {
+  assert.strictEqual(P.isSessionOver({ lastSeenMs: at(11, 0) }, NOW), false);
+});
+
+test('sans échéance ni nouvelle depuis plus d\'une session, elle est finie', () => {
+  assert.strictEqual(P.isSessionOver({ lastSeenMs: atOffsetDay(-1, 22, 0) }, NOW), true);
+});
+
+test('une session sans aucun repère n\'est jamais déclarée finie', () => {
+  assert.strictEqual(P.isSessionOver({ status: P.STATUS.ON_SITE }, NOW), false);
+});
+
+test('pas de session, rien à terminer', () => {
+  assert.strictEqual(P.isSessionOver(null, NOW), false);
+});
+
 // ------------------------------------------------------------- formatage
 
 group('formatDuration / formatClock');
@@ -436,6 +506,36 @@ test('jamais de durée négative', () => {
 test('formate l\'heure sur deux chiffres', () => {
   assert.strictEqual(P.formatClock(at(9, 5)), '09:05');
   assert.strictEqual(P.formatClock(at(14, 31)), '14:31');
+});
+
+// ------------------------------------------------------------------ badge
+
+group('badgeText / badgeColor');
+
+test('les heures priment sur les minutes', () => {
+  assert.strictEqual(P.badgeText(3 * 3600 + 50 * 60), '3h');
+  assert.strictEqual(P.badgeText(3600), '1h');
+});
+
+test('arrondi vers le bas : jamais plus de temps qu\'il n\'en reste', () => {
+  assert.strictEqual(P.badgeText(3599), '59m');
+  assert.strictEqual(P.badgeText(21 * 60 + 59), '21m');
+});
+
+test('sous la minute, il reste quand même quelque chose', () => {
+  assert.strictEqual(P.badgeText(30), '1m');
+});
+
+test('rien à afficher sans temps restant', () => {
+  assert.strictEqual(P.badgeText(0), '');
+  assert.strictEqual(P.badgeText(-10), '');
+  assert.strictEqual(P.badgeText(null), '');
+});
+
+test('la couleur suit les seuils du popup', () => {
+  assert.strictEqual(P.badgeColor(3600, 1800), '#1f8a4c');
+  assert.strictEqual(P.badgeColor(1200, 1800), '#c9500f');
+  assert.strictEqual(P.badgeColor(120, 1800), '#d7263d');
 });
 
 // ---------------------------------------------------------------- bilan

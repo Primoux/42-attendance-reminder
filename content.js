@@ -8,10 +8,14 @@
 const api = typeof browser !== 'undefined' ? browser : chrome;
 
 const TICK_MS = 15000;
-const MUTATION_DEBOUNCE_MS = 1000;
+// `detect()` fait trois parcours complets du DOM (échéance, compte à rebours,
+// candidats) : la page rafraîchissant son compte à rebours toute seule, un
+// debounce court reviendrait à les refaire en boucle pour rien.
+const MUTATION_DEBOUNCE_MS = 5000;
 
 let debug = DEFAULT_SETTINGS.debug;
 let lastSignature = null;
+let lastSentMs = 0;
 let mutationTimer = null;
 
 function log(...args) {
@@ -67,6 +71,13 @@ function tick(reason) {
   if (state.status === STATUS.UNKNOWN && changed) {
     warn('aucun marqueur "On Site" trouvé sur cette page. URL:', location.pathname);
   }
+
+  // Le background ne s'intéresse qu'aux changements ; le reste n'est qu'un
+  // battement de cœur pour `lastSeenMs`. Sans ce filtre, chaque mutation
+  // déclenchait un message, donc un réveil de la page background et une
+  // écriture dans storage.local — en continu, sur un onglet ouvert la journée.
+  if (!changed && now - lastSentMs < TICK_MS - 1000) return;
+  lastSentMs = now;
 
   try {
     const sending = api.runtime.sendMessage({

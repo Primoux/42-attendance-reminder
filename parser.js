@@ -9,6 +9,10 @@
 // l'échéance est affichée.
 const SESSION_MAX_SECONDS = 4 * 3600;
 
+// attendance est un outil développé par 42 Lyon pour son propre campus : il n'y
+// a pas d'équivalent ailleurs, donc rien d'autre à cibler qu'un seul domaine.
+const ATTENDANCE_HOST = 'attendance.42lyon.fr';
+
 const STATUS = {
   ON_SITE: 'on_site',
   ON_SITE_UNSAVED: 'on_site_unsaved',
@@ -253,6 +257,37 @@ function sessionExpiry(session) {
 }
 
 /**
+ * Une session est finie quand son échéance est passée : il n'y a plus rien à
+ * sauver, et la garder ferait traîner son `startMs` dans la session suivante
+ * (« 9h12 sur place » au badge du lendemain).
+ * Sans échéance connue, on se rabat sur la dernière confirmation de la page :
+ * au-delà d'une durée de session sans nouvelle, l'info n'est plus crédible.
+ */
+function isSessionOver(session, nowMs) {
+  if (!session) return false;
+  const expiry = sessionExpiry(session);
+  if (expiry) return nowMs > expiry;
+  if (!session.lastSeenMs) return false;
+  return nowMs - session.lastSeenMs > SESSION_MAX_SECONDS * 1000;
+}
+
+// Un compte à rebours n'a que la minute pour granularité : l'échéance qu'on en
+// déduit (maintenant + reste) bouge de quelques secondes à chaque lecture.
+// Sans tolérance, chaque tick passerait pour un rebadge.
+const EXPIRY_NOISE_SECONDS = 120;
+
+/**
+ * L'échéance qui arrive est-elle une vraie nouvelle échéance (rebadge), ou le
+ * même instant relu avec quelques secondes d'écart ? Un rebadge repousse de
+ * plusieurs minutes au minimum, jamais de trois secondes.
+ */
+function isNewDeadline(currentExpiryMs, incomingExpiryMs) {
+  if (!incomingExpiryMs) return false;
+  if (!currentExpiryMs) return true;
+  return Math.abs(incomingExpiryMs - currentExpiryMs) > EXPIRY_NOISE_SECONDS * 1000;
+}
+
+/**
  * Anti-spam : décide s'il faut notifier maintenant, en fonction du temps
  * restant avant l'échéance.
  * session : { startMs?, expiryMs?, notifiedCount, lastNotifiedMs }
@@ -269,7 +304,10 @@ function decideNotification(session, settings, nowMs) {
   const result = (kind) => ({ notify: true, kind, remainingSeconds, elapsedSeconds });
   const sinceLast = (nowMs - (session.lastNotifiedMs || 0)) / 1000;
 
-  if (remainingSeconds <= 0) return quiet; // échéance passée, plus rien à sauver
+  // Échéance passée : le logtime est perdu, mais le silence serait ambigu — au
+  // réveil après une veille machine, aucune alerte n'a pu partir et rien ne
+  // distingue « rien à signaler » de « c'est trop tard ». Une dernière, une seule.
+  if (remainingSeconds <= 0) return session.expiredNotified ? quiet : result('expired');
 
   // Dernière ligne droite : au plus une notification par minute.
   // Le min() évite d'écraser un seuil volontairement plus court (mode test).
@@ -292,6 +330,26 @@ function clampWarnBefore(seconds, testMode) {
   return Math.min(Math.max(Math.round(n), min), max);
 }
 
+/**
+ * Texte du badge de l'icône : deux caractères utiles, pas plus — au-delà,
+ * Firefox tronque. Arrondi vers le bas, jamais vers le haut : mieux vaut
+ * afficher un peu moins de temps qu'il n'en reste que de laisser croire qu'il
+ * en reste plus. « 0m » n'existe pas : sous la minute il reste encore quelque
+ * chose, on affiche « 1m ».
+ */
+function badgeText(remainingSeconds) {
+  if (!Number.isFinite(remainingSeconds) || remainingSeconds <= 0) return '';
+  if (remainingSeconds >= 3600) return `${Math.floor(remainingSeconds / 3600)}h`;
+  return `${Math.max(1, Math.floor(remainingSeconds / 60))}m`;
+}
+
+/** Couleur du badge, alignée sur les seuils du popup. */
+function badgeColor(remainingSeconds, warnBeforeSeconds) {
+  if (remainingSeconds <= 300) return '#d7263d';
+  if (remainingSeconds <= warnBeforeSeconds) return '#c9500f';
+  return '#1f8a4c';
+}
+
 function formatDuration(seconds) {
   const total = Math.max(0, Math.floor(seconds));
   const h = Math.floor(total / 3600);
@@ -309,9 +367,10 @@ function formatClock(ms) {
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
-    SESSION_MAX_SECONDS, STATUS, DEFAULT_SETTINGS,
+    SESSION_MAX_SECONDS, ATTENDANCE_HOST, STATUS, DEFAULT_SETTINGS,
     normalize, findTimes, resolveClockTime, parseIso, readIsoAttr,
     collectCandidates, analyze, detect, detectExpiry, findShortestMatch, isOnSite, sessionExpiry,
-    decideNotification, clampWarnBefore, formatDuration, formatClock
+    isSessionOver, isNewDeadline, EXPIRY_NOISE_SECONDS,
+    decideNotification, clampWarnBefore, badgeText, badgeColor, formatDuration, formatClock
   };
 }
