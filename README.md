@@ -93,12 +93,16 @@ Clique sur l'icône de l'extension.
 
 ```sh
 npm test    # parser.js, background.js, et manifest/package.json en phase
-npm run lint    # web-ext lint, avant toute soumission AMO
+npm run lint    # web-ext lint, avant toute soumission AMO (exige Node >= 20)
 npm run build   # web-ext-artifacts/42-attendance-reminder.zip
 ```
 
 `version` est dupliqué entre `manifest.json` et `package.json` : `version:check`
 casse le test et le build si les deux divergent.
+
+Les tests et le build tournent sur n'importe quel Node ; seul `lint` demande un
+Node ≥ 20, parce que web-ext l'exige. Le script le vérifie et le dit, plutôt que
+de laisser web-ext échouer sur un `SyntaxError` incompréhensible.
 
 `test/background.test.js` charge `parser.js` puis `background.js` dans un `vm`
 avec un faux `browser` (`test/fake-api.js`), comme Firefox charge les deux
