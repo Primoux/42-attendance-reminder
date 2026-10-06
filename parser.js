@@ -261,10 +261,15 @@ function detect(root, nowMs) {
  */
 function detectRemote(root, nowMs) {
   const expiry = detectExpiry(root, nowMs);
-  const fromDom = analyze(collectCandidates(root), nowMs);
+  const candidates = collectCandidates(root);
+  const fromDom = analyze(candidates, nowMs);
   if (expiry && expiry.expiryMs) {
+    // `analyze` choisit sa ligne d'après l'horloge, donc au hasard ici : d'une
+    // relecture à l'autre le statut oscillait entre « unsaved » et non. Une
+    // ligne « unsaved » quelque part suffit, c'est toujours la présence en cours.
+    const unsaved = candidates.some((c) => RE_UNSAVED.test(c.text));
     return {
-      status: isOnSite(fromDom.status) ? fromDom.status : STATUS.ON_SITE,
+      status: unsaved ? STATUS.ON_SITE_UNSAVED : STATUS.ON_SITE,
       startMs: expiry.expiryMs - SESSION_MAX_SECONDS * 1000,
       expiryMs: expiry.expiryMs,
       source: expiry.source,
