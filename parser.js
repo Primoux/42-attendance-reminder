@@ -199,9 +199,15 @@ function detectExpiry(root, nowMs) {
   const absolute = findShortestMatch(root, RE_EXPIRY);
   if (absolute) {
     const m = RE_EXPIRY.exec(absolute);
-    const expiryMs = resolveClockTime(
-      { hours: parseInt(m[1], 10), minutes: parseInt(m[2], 10) }, nowMs, 'future'
-    );
+    const time = { hours: parseInt(m[1], 10), minutes: parseInt(m[2], 10) };
+    let expiryMs = resolveClockTime(time, nowMs, 'future');
+    // Une échéance ne tombe jamais plus de 4 h plus tard. Au-delà, c'est une
+    // page restée ouverte sans rechargement : son « expire à 01:37 » est déjà
+    // passé, et le lire comme celui de demain ouvrirait une session fantôme de
+    // presque 24 h.
+    if (expiryMs - nowMs > (SESSION_MAX_SECONDS + 5 * 60) * 1000) {
+      expiryMs = resolveClockTime(time, nowMs);
+    }
     return { expiryMs, source: 'expiry', raw: absolute };
   }
   const countdown = findShortestMatch(root, RE_COUNTDOWN, 40);
@@ -285,6 +291,47 @@ function isNewDeadline(currentExpiryMs, incomingExpiryMs) {
   if (!incomingExpiryMs) return false;
   if (!currentExpiryMs) return true;
   return Math.abs(incomingExpiryMs - currentExpiryMs) > EXPIRY_NOISE_SECONDS * 1000;
+}
+
+/**
+ * Deux lectures décrivent-elles le même badge ? Même tolérance que
+ * `isNewDeadline` sur l'échéance, pour la même raison.
+ */
+function sameBadgeState(a, b) {
+  if (!a || !b || a.status !== b.status) return false;
+  if (!a.expiryMs || !b.expiryMs) return !a.expiryMs && !b.expiryMs;
+  return Math.abs(a.expiryMs - b.expiryMs) <= EXPIRY_NOISE_SECONDS * 1000;
+}
+
+/**
+ * Choisit entre ce que la page affiche et la dernière lecture redemandée au
+ * serveur. La page attendance ne se met pas à jour après un badge : tant que
+ * son DOM n'a pas bougé depuis la relecture, c'est la relecture qui est à jour.
+ * S'il a bougé (rechargement partiel), c'est lui le plus récent.
+ * fresh : { state, domState } - la relecture, et le DOM au même instant.
+ */
+function pickState(domState, fresh) {
+  if (!fresh || !fresh.state || fresh.state.status === STATUS.UNKNOWN) return domState;
+  // même texte brut : la page n'a pas changé, même si l'heure qu'on en déduit
+  // a glissé (un compte à rebours, lui, change de texte chaque minute)
+  const unchanged = (domState.raw && domState.raw === fresh.domState.raw)
+    || sameBadgeState(domState, fresh.domState);
+  return unchanged ? fresh.state : domState;
+}
+
+const REFRESH_SECONDS = 5 * 60;
+const REFRESH_URGENT_SECONDS = 60;
+
+/**
+ * Délai avant de redemander la page au serveur. Resserré à l'approche du
+ * préavis : c'est là qu'un rebadge non vu coûte une fausse alerte. La marge
+ * d'un cycle garantit une lecture de moins d'une minute au moment d'alerter.
+ */
+function refreshDelayMs(state, warnBeforeSeconds, nowMs) {
+  const remaining = state && state.expiryMs ? (state.expiryMs - nowMs) / 1000 : null;
+  const urgent = remaining !== null && remaining > 0
+    && remaining <= warnBeforeSeconds + REFRESH_SECONDS;
+  return (urgent ? REFRESH_URGENT_SECONDS : REFRESH_SECONDS) * 1000;
 }
 
 /**
@@ -376,6 +423,7 @@ if (typeof module !== 'undefined' && module.exports) {
     normalize, findTimes, resolveClockTime, parseIso, readIsoAttr,
     collectCandidates, analyze, detect, detectExpiry, findShortestMatch, isOnSite, sessionExpiry,
     isSessionOver, isNewDeadline, EXPIRY_NOISE_SECONDS,
+    sameBadgeState, pickState, refreshDelayMs, REFRESH_SECONDS, REFRESH_URGENT_SECONDS,
     decideNotification, warnBeforeUnitSeconds, clampWarnBefore, badgeText, badgeColor, formatDuration, formatClock
   };
 }

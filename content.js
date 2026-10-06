@@ -14,6 +14,12 @@ const TICK_MS = 15000;
 const MUTATION_DEBOUNCE_MS = 5000;
 
 let debug = DEFAULT_SETTINGS.debug;
+let warnBeforeSeconds = DEFAULT_SETTINGS.warnBeforeSeconds;
+// La page attendance ne se met pas à jour après un badge : seul son compte à
+// rebours bouge. On la redemande donc au serveur, sans la recharger à l'écran.
+let fresh = null; // { state, domState } - cf. pickState
+let lastRefreshMs = Date.now(); // la page vient d'être chargée, son DOM est à jour
+let refreshing = false;
 let lastSignature = null;
 let lastSentMs = 0;
 let mutationTimer = null;
@@ -26,12 +32,16 @@ function warn(...args) {
   console.warn('[42 Reminder]', ...args);
 }
 
-async function loadDebugFlag() {
+function applySettings(settings) {
+  if (!settings) return;
+  if (typeof settings.debug === 'boolean') debug = settings.debug;
+  if (Number.isFinite(settings.warnBeforeSeconds)) warnBeforeSeconds = settings.warnBeforeSeconds;
+}
+
+async function loadSettings() {
   try {
     const stored = await api.storage.local.get('settings');
-    if (stored && stored.settings && typeof stored.settings.debug === 'boolean') {
-      debug = stored.settings.debug;
-    }
+    applySettings(stored && stored.settings);
   } catch (err) {
     warn('lecture des settings impossible:', err);
   }
@@ -50,15 +60,48 @@ function describe(state) {
   return `${state.status} ${parts.join(', ')} [${src}]`;
 }
 
+/**
+ * Relit la page côté serveur. Un échec (réseau, session 42 expirée, page de
+ * login) ne change rien : on garde ce qu'on savait.
+ */
+async function refresh() {
+  if (refreshing) return;
+  refreshing = true;
+  lastRefreshMs = Date.now();
+  try {
+    const response = await fetch(location.href, { credentials: 'include', cache: 'no-store' });
+    if (!response.ok) {
+      log('[fetch] réponse', response.status, ': relecture ignorée');
+      return;
+    }
+    const doc = new DOMParser().parseFromString(await response.text(), 'text/html');
+    const now = Date.now();
+    const state = detect(doc, now);
+    if (state.status === STATUS.UNKNOWN) {
+      log('[fetch] rien de lisible dans la réponse : relecture ignorée');
+      return;
+    }
+    state.source = `fetch:${state.source || 'aucune'}`;
+    fresh = { state, domState: detect(document, now) };
+    tick('fetch');
+  } catch (err) {
+    log('[fetch] relecture en échec:', err.message || err);
+  } finally {
+    refreshing = false;
+  }
+}
+
 function tick(reason) {
   const now = Date.now();
   let state;
   try {
-    state = detect(document, now);
+    state = pickState(detect(document, now), fresh);
   } catch (err) {
     warn('détection en échec:', err);
     return;
   }
+
+  if (now - lastRefreshMs >= refreshDelayMs(state, warnBeforeSeconds, now)) refresh();
 
   // signature = ce qui compte pour le background ; évite le spam de messages
   const signature = `${state.status}|${state.startMs || 0}|${state.expiryMs || 0}`;
@@ -129,14 +172,11 @@ try {
 }
 
 api.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && changes.settings && changes.settings.newValue) {
-    const next = changes.settings.newValue.debug;
-    if (typeof next === 'boolean') debug = next;
-  }
+  if (area === 'local' && changes.settings) applySettings(changes.settings.newValue);
 });
 
 // Log inconditionnel : c'est le seul moyen de distinguer "content script pas
 // injecté" (aucune ligne) de "injecté mais rien trouvé" (statut unknown).
 console.log('[42 Reminder] content script actif sur', location.href);
 
-loadDebugFlag().then(() => tick('init'));
+loadSettings().then(() => tick('init'));
