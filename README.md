@@ -21,6 +21,12 @@ Depuis [Firefox Add-ons](https://addons.mozilla.org/fr/firefox/) — cherche
   parcourt le DOM trois fois, et la page rafraîchit son compte à rebours toute
   seule — sans ce filtre, chaque mutation réveillait la page background et
   écrivait dans `storage.local`.
+- La page attendance ne se met pas à jour après un badge : seul son compte à
+  rebours défile. `content.js` la redemande donc au serveur (toutes les 5 min,
+  chaque minute à l'approche du préavis) et lit l'échéance dans la réponse,
+  sans recharger l'onglet. Un rebadge ou un badge out est ainsi vu sans F5,
+  tant qu'un onglet attendance reste ouvert. Si la relecture échoue (réseau,
+  session 42 expirée), ce que la page affiche continue de faire foi.
 - `background.js` est seul à décider des notifications. Tout son état vit dans
   `storage.local` : en MV3 la page background est non-persistante, la mémoire est
   perdue à tout moment.
@@ -111,7 +117,7 @@ revoir.
 ## Développement
 
 ```sh
-npm test    # parser.js, background.js, et manifest/package.json en phase
+npm test    # parser.js, background.js, content.js, et manifest/package.json en phase
 npm run lint    # web-ext lint, avant toute soumission AMO (exige Node >= 20)
 npm run build   # web-ext-artifacts/42-attendance-reminder.zip
 ```
@@ -130,6 +136,8 @@ de laisser web-ext échouer sur un `SyntaxError` incompréhensible.
 avec un faux `browser` (`test/fake-api.js`), comme Firefox charge les deux
 scripts dans la même page. C'est là que se testent les scénarios qui n'ont
 aucun DOM : onglet fermé, réveil après veille, badge du lendemain, rebadge.
+`test/content.test.js` fait de même pour `content.js`, avec un faux `fetch` et
+une horloge avancée à la main : rebadge et badge out vus sans rechargement.
 
 Le zip est fabriqué avec `zip(1)` et liste explicitement les fichiers
 empaquetés : ni les tests ni aucun fichier parasite ne partent sur AMO. Ajouter
@@ -162,7 +170,7 @@ for s in (16, 48, 96, 128):
 |---|---|
 | `manifest.json` | config MV3 |
 | `parser.js` | logique pure, partagée par tous les scripts et les tests |
-| `test/` | tests de `parser.js` et `background.js`, non empaquetés |
+| `test/` | tests de `parser.js`, `background.js` et `content.js`, non empaquetés |
 | `content.js` | observation du DOM attendance |
 | `background.js` | état des sessions, notifications |
 | `popup.html` / `popup.js` | UI (thème clair/sombre auto) |

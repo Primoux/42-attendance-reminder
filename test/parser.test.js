@@ -278,6 +278,17 @@ test('l\'échéance absolue prime sur le compte à rebours', () => {
   assert.strictEqual(P.detectExpiry(dom('03h08m', 'session expire à 14:31'), NOW).source, 'expiry');
 });
 
+test('une page restée ouverte après l\'échéance ne la repousse pas à demain', () => {
+  // 12:00, la page affiche encore « expire à 11:40 » : c'est passé, pas demain
+  const r = P.detectExpiry(dom('session expires at 11:40'), NOW);
+  assert.strictEqual(r.expiryMs, at(11, 40));
+});
+
+test('une échéance après minuit reste celle de demain', () => {
+  const r = P.detectExpiry(dom('session expires at 01:37'), at(23, 0));
+  assert.strictEqual(r.expiryMs, atOffsetDay(1, 1, 37));
+});
+
 test('rend null quand la page ne dit rien', () => {
   assert.strictEqual(P.detectExpiry(dom('On Site 10:31'), NOW), null);
 });
@@ -367,6 +378,67 @@ test('pas d\'échéance connue : la première est une nouveauté', () => {
 
 test('rien n\'arrive : rien ne change', () => {
   assert.strictEqual(P.isNewDeadline(at(14, 31), null), false);
+});
+
+// ------------------------------------------------------------- pickState
+
+group('pickState');
+
+const read = (status, expiryMs, raw) => ({ status, expiryMs, raw });
+
+test('sans relecture, la page fait foi', () => {
+  const page = read('on_site', at(14, 31), 'expire à 14:31');
+  assert.strictEqual(P.pickState(page, null), page);
+});
+
+test('rebadge non affiché : la relecture l\'emporte sur la page figée', () => {
+  const page = read('on_site', at(14, 31), 'expire à 14:31');
+  const server = read('on_site', at(16, 0), 'expire à 16:00');
+  assert.strictEqual(P.pickState(page, { state: server, domState: page }), server);
+});
+
+test('badge out non affiché : la relecture l\'emporte aussi', () => {
+  const page = read('on_site', at(14, 31), 'expire à 14:31');
+  const server = read('off_site', null, null);
+  assert.strictEqual(P.pickState(page, { state: server, domState: page }), server);
+});
+
+test('la page a changé depuis la relecture : c\'est elle la plus récente', () => {
+  const before = read('on_site', at(14, 31), 'expire à 14:31');
+  const server = read('on_site', at(16, 0), 'expire à 16:00');
+  const page = read('on_site', at(17, 0), 'expire à 17:00');
+  assert.strictEqual(P.pickState(page, { state: server, domState: before }), page);
+});
+
+test('un compte à rebours qui défile n\'est pas un changement de page', () => {
+  const before = read('on_site', NOW + 3600 * 1000, '01h00m');
+  const page = read('on_site', NOW + 3600 * 1000 + 40 * 1000, '00h59m');
+  const server = read('on_site', at(16, 0), 'expire à 16:00');
+  assert.strictEqual(P.pickState(page, { state: server, domState: before }), server);
+});
+
+test('une relecture illisible est ignorée', () => {
+  const page = read('on_site', at(14, 31), 'expire à 14:31');
+  const server = read('unknown', null, null);
+  assert.strictEqual(P.pickState(page, { state: server, domState: page }), page);
+});
+
+// -------------------------------------------------------- refreshDelayMs
+
+group('refreshDelayMs');
+
+test('loin de l\'échéance : une relecture toutes les 5 min', () => {
+  assert.strictEqual(P.refreshDelayMs({ expiryMs: NOW + 3 * 3600 * 1000 }, 1800, NOW), 300 * 1000);
+});
+
+test('à l\'approche du préavis : une par minute', () => {
+  assert.strictEqual(P.refreshDelayMs({ expiryMs: NOW + 34 * 60 * 1000 }, 1800, NOW), 60 * 1000);
+  assert.strictEqual(P.refreshDelayMs({ expiryMs: NOW + 60 * 1000 }, 1800, NOW), 60 * 1000);
+});
+
+test('pas badgé ou échéance passée : retour au rythme lent', () => {
+  assert.strictEqual(P.refreshDelayMs({ expiryMs: null }, 1800, NOW), 300 * 1000);
+  assert.strictEqual(P.refreshDelayMs({ expiryMs: NOW - 60 * 1000 }, 1800, NOW), 300 * 1000);
 });
 
 // --------------------------------------------------- decideNotification
