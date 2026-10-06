@@ -1,11 +1,11 @@
 {
   "name": "42-attendance-reminder",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Extension Firefox : prévient avant de perdre son logtime à 3h59",
   "private": true,
   "license": "MIT",
   "scripts": {
-    "test": "npm run version:check --silent && node test/parser.test.js && node test/background.test.js",
+    "test": "npm run version:check --silent && node test/parser.test.js && node test/background.test.js && node test/content.test.js",
     "version:check": "node -e \"const m=require('./manifest.json'),p=require('./package.json');if(m.version!==p.version){console.error('version: manifest.json '+m.version+' != package.json '+p.version);process.exit(1)}console.log('version '+m.version+' ok')\"",
     "lint": "node -e \"const maj=Number(process.versions.node.split('.')[0]);if(maj<20){console.error('web-ext exige Node >= 20, ici '+process.versions.node+' : installe-le (nvm install 20) ou lance le lint ailleurs');process.exit(1)}\" && npx --yes web-ext lint",
     "build": "npm run version:check --silent && rm -rf web-ext-artifacts && mkdir -p web-ext-artifacts && zip -q -r web-ext-artifacts/42-attendance-reminder.zip manifest.json background.js content.js parser.js popup.html popup.js icon-16.png icon-48.png icon-96.png icon-128.png && echo 'web-ext-artifacts/42-attendance-reminder.zip prêt'"
