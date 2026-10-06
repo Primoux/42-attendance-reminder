@@ -404,7 +404,18 @@ test('ne garde que l\'échéance, et en déduit le début', () => {
   assert.strictEqual(r.expiryMs, atOffsetDay(1, 4, 55));
   assert.strictEqual(r.startMs, atOffsetDay(1, 0, 55));
   assert.strictEqual(r.source, 'expiry');
-  assert.strictEqual(P.isOnSite(r.status), true);
+  assert.strictEqual(r.status, 'on_site_unsaved');
+});
+
+test('le statut ne dépend pas de l\'heure de la relecture', () => {
+  // d'une minute à l'autre, une durée différente colle à l'horloge : le statut
+  // oscillait entre on_site et on_site_unsaved
+  for (const minute of [1, 6, 26, 55]) {
+    const r = P.detectRemote(serverPage(), atOffsetDay(1, 0, minute));
+    assert.strictEqual(r.status, 'on_site_unsaved', `à 00:${minute}`);
+  }
+  const saved = P.detectRemote(dom('session expires at 04:55', 'On Site 22:00 22:55'), atOffsetDay(1, 1, 1));
+  assert.strictEqual(saved.status, 'on_site');
 });
 
 test('badgé mais sans échéance annoncée : ne conclut rien', () => {
