@@ -50,8 +50,7 @@ Une ligne d'attendance se termine par sa durée (`On Site Unsaved 10:31 → 11:2
 maintenant » plutôt que « la dernière heure de la ligne ».
 
 Sont gérés : `On Site`, `On Site Unsaved`, `On site (unsaved)`, séparateurs `:`
-ou `h`, heure de la veille (badge après minuit), et le badge out (reset du timer
-et rangement de la session dans l'historique).
+ou `h`, heure de la veille (badge après minuit), et le badge out (reset du timer).
 
 Si aucun marqueur n'est trouvé, l'état passe à `unknown` et la session **n'est pas**
 effacée — le DOM de la page peut changer, on préfère garder le timer que le perdre.
@@ -89,6 +88,22 @@ plus que défensif aujourd'hui, pour de l'état écrit par une version antérieu
 
 Clique sur l'icône de l'extension.
 
+- **Prévenir avant l'échéance** : préavis en minutes (défaut 30).
+- **Relancer toutes les** : intervalle des rappels.
+
+Le préavis est borné à 1 min minimum : impossible de configurer une alerte qui
+arrive trop tard.
+
+Le réglage `debug` n'a pas de champ dans le popup et se pose depuis la console
+du background (`about:debugging` → Inspecter) :
+
+```js
+browser.storage.local.get('settings').then(({ settings }) =>
+  browser.storage.local.set({ settings: { ...settings, debug: true } }));
+```
+
+Il trace chaque tick dans la console de la page attendance et du background.
+
 ## Développement
 
 ```sh
@@ -96,6 +111,9 @@ npm test    # parser.js, background.js, et manifest/package.json en phase
 npm run lint    # web-ext lint, avant toute soumission AMO (exige Node >= 20)
 npm run build   # web-ext-artifacts/42-attendance-reminder.zip
 ```
+
+Pour tester en local, charge le dossier via `about:debugging` → « Charger un
+module temporaire ».
 
 `version` est dupliqué entre `manifest.json` et `package.json` : `version:check`
 casse le test et le build si les deux divergent.
@@ -109,37 +127,9 @@ avec un faux `browser` (`test/fake-api.js`), comme Firefox charge les deux
 scripts dans la même page. C'est là que se testent les scénarios qui n'ont
 aucun DOM : onglet fermé, réveil après veille, badge du lendemain, rebadge.
 
-- **Prévenir avant l'échéance** : préavis en minutes (défaut 30).
-- **Relancer toutes les** : intervalle des rappels.
-
-Deux réglages n'ont pas de champ dans le popup et se posent depuis la console
-du background (`about:debugging` → Inspecter) :
-
-```js
-browser.storage.local.get('settings').then(({ settings }) =>
-  browser.storage.local.set({ settings: { ...settings, debug: true } }));
-```
-
-- `debug` : trace chaque tick dans la console de la page attendance et du
-  background.
-- `testMode` : autorise un `warnBeforeSeconds` descendant à 5 s, pour vérifier
-  la chaîne de notification sans attendre des heures.
-
-Le préavis est borné à 1 min minimum : impossible de configurer une alerte qui
-arrive trop tard.
-
-## Développement
-
-Le code de la branche `main` est celui qui part sur AMO : pas de tests, pas
-d'outillage. Le développement et les tests vivent sur la branche `dev`.
-
-```sh
-npm run build    # web-ext-artifacts/42-attendance-reminder.zip
-```
-
 Le zip est fabriqué avec `zip(1)` et liste explicitement les fichiers
-empaquetés : aucun fichier parasite ne part sur AMO. Ajouter un fichier au
-paquet demande de compléter la liste dans `package.json`.
+empaquetés : ni les tests ni aucun fichier parasite ne partent sur AMO. Ajouter
+un fichier au paquet demande de compléter la liste dans `package.json`.
 
 Les icônes empaquetées sont les `.png` : AMO veut du bitmap pour la fiche du
 module. Les `.svg` restent la source ; après les avoir modifiées, régénère :
@@ -151,15 +141,11 @@ for s in (16, 48, 96, 128):
                      output_width=s, output_height=s)"
 ```
 
-`web-ext` n'est pas utilisé : il exige Node >= 16 et ne suffit pas au
-rechargement automatique ici. Pour tester en local, charge le dossier via
-`about:debugging` → « Charger un module temporaire ».
-
 ## Publier
 
-1. Incrémente `version` dans `manifest.json` — AMO refuse une version déjà
-   envoyée, définitivement.
-2. `npm run build`
+1. Incrémente `version` dans `manifest.json` **et** `package.json` — AMO refuse
+   une version déjà envoyée, définitivement.
+2. `npm test && npm run lint && npm run build`
 3. [addons.mozilla.org/developers](https://addons.mozilla.org/developers/) →
    *Submit a New Add-on* → **On your own** (auto-distribution, validation
    automatique) ou *On this site* (revue humaine, publication publique).
@@ -172,8 +158,9 @@ rechargement automatique ici. Pour tester en local, charge le dossier via
 |---|---|
 | `manifest.json` | config MV3 |
 | `parser.js` | logique pure, partagée par tous les scripts et les tests |
+| `test/` | tests de `parser.js` et `background.js`, non empaquetés |
 | `content.js` | observation du DOM attendance |
-| `background.js` | état des sessions, notifications, historique |
+| `background.js` | état des sessions, notifications |
 | `popup.html` / `popup.js` | UI (thème clair/sombre auto) |
 | `icon-*.png` | icônes 16/48/96/128 empaquetées (chronomètre + pastille d'alerte) |
 | `icon-*.svg` | sources vectorielles des icônes, non empaquetées |
