@@ -94,15 +94,19 @@ Clique sur l'icône de l'extension.
 Le préavis est borné à 1 min minimum : impossible de configurer une alerte qui
 arrive trop tard.
 
-Le réglage `debug` n'a pas de champ dans le popup et se pose depuis la console
-du background (`about:debugging` → Inspecter) :
+La section « Avancé » du popup porte deux réglages de mise au point :
 
-```js
-browser.storage.local.get('settings').then(({ settings }) =>
-  browser.storage.local.set({ settings: { ...settings, debug: true } }));
-```
+- **Journal de debug** : trace chaque tick dans la console de la page
+  attendance et du background (`about:debugging` → Inspecter).
+- **Mode test** : le préavis se saisit en secondes et descend à 5 s, pour
+  vérifier la chaîne de notification sans attendre des heures. Sous la minute,
+  l'alerte part au tick du content script (15 s) : il faut un onglet attendance
+  ouvert, l'alarme du background ne sonnant qu'une fois par minute.
 
-Il trace chaque tick dans la console de la page attendance et du background.
+Quand un onglet attendance est ouvert mais qu'aucun badge n'y est reconnu, le
+popup le dit (« Page attendance ouverte, mais aucun badge reconnu ») : soit tu
+n'es pas connecté, soit le format de la page a changé et la détection est à
+revoir.
 
 ## Développement
 

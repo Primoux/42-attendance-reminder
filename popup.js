@@ -1,11 +1,16 @@
 const api = typeof browser !== 'undefined' ? browser : chrome;
 
 const el = (id) => document.getElementById(id);
-const fields = { minutes: el('minutes'), repeat: el('repeat') };
+const fields = {
+  minutes: el('minutes'),
+  repeat: el('repeat'),
+  debug: el('debug'),
+  testMode: el('testMode')
+};
 
 let refreshTimer = null;
-// Les réglages sans champ dans le popup (debug, testMode) ne doivent pas être
-// écrasés à l'enregistrement : storage.local.set remplace l'objet entier.
+// Un réglage sans champ dans le popup ne doit pas être écrasé à
+// l'enregistrement : storage.local.set remplace l'objet entier.
 let currentSettings = null;
 
 function showMessage(text, isError) {
@@ -17,21 +22,34 @@ function showMessage(text, isError) {
 
 function applySettings(settings) {
   currentSettings = settings;
-  fields.minutes.value = Math.max(1, Math.round(settings.warnBeforeSeconds / 60));
+  // Le champ de préavis change d'unité avec le mode test : c'est le réglage
+  // *enregistré* qui fait foi, pas la case tant qu'elle n'est pas validée.
+  const unit = warnBeforeUnitSeconds(settings.testMode);
+  fields.minutes.value = Math.max(1, Math.round(settings.warnBeforeSeconds / unit));
+  fields.minutes.max = (SESSION_MAX_SECONDS - 60) / unit;
+  el('minutesUnit').textContent = settings.testMode ? 's' : 'min';
+  fields.debug.checked = Boolean(settings.debug);
+  fields.testMode.checked = Boolean(settings.testMode);
   fields.repeat.value = Math.round(settings.repeatSeconds / 60);
 }
 
 /** Un champ vide ne vaut pas 0 : on garde la valeur par défaut. */
 function readSettings(previous) {
+  // Le champ est encore dans l'unité affichée (l'ancien mode), alors que la
+  // borne à appliquer est celle du mode qu'on enregistre.
+  const unit = warnBeforeUnitSeconds(previous && previous.testMode);
+  const testMode = fields.testMode.checked;
   const minutes = Number(fields.minutes.value);
   const raw = fields.minutes.value !== '' && Number.isFinite(minutes) && minutes > 0
-    ? minutes * 60
+    ? minutes * unit
     : DEFAULT_SETTINGS.warnBeforeSeconds;
-  const warnBeforeSeconds = clampWarnBefore(raw, false);
+  const warnBeforeSeconds = clampWarnBefore(raw, testMode);
   const repeatMinutes = Math.min(Math.max(Number(fields.repeat.value) || 15, 1), 120);
   return Object.assign({}, previous, {
     warnBeforeSeconds,
     repeatSeconds: repeatMinutes * 60,
+    debug: fields.debug.checked,
+    testMode,
     _clamped: warnBeforeSeconds !== raw
   });
 }
@@ -68,6 +86,10 @@ function renderStatus(info) {
     } else if (isOnSite(info.lastStatus)) {
       // badgé mais plus aucune échéance à surveiller : le logtime est déjà perdu
       statusNode.textContent = 'Badgé, échéance dépassée. Rebadge pour repartir.';
+    } else if (info.attendanceTabOpen) {
+      // un onglet rapporte, mais rien de lisible : pas connecté, ou DOM changé
+      statusNode.textContent = 'Page attendance ouverte, mais aucun badge reconnu. '
+        + 'Connecte-toi, ou le format de la page a changé.';
     } else {
       statusNode.textContent = `Aucune session détectée sur ${ATTENDANCE_HOST}.`;
     }
