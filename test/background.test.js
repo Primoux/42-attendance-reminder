@@ -291,6 +291,33 @@ test('getStatus masque une session dont l\'échéance est passée', async () => 
   assert.strictEqual(info.lastStatus, 'on_site'); // le popup peut dire "badgé, échéance dépassée"
 });
 
+test('getStatus dit si un onglet attendance est ouvert', async () => {
+  const { api } = await load();
+  let info = await api._messageListener({ action: 'getStatus' });
+  assert.strictEqual(info.attendanceTabOpen, false);
+
+  api.tabs.query = async () => [{ id: 7 }];
+  info = await api._messageListener({ action: 'getStatus' });
+  assert.strictEqual(info.attendanceTabOpen, true);
+});
+
+test('getStatus survit à un tabs.query en échec', async () => {
+  const { api } = await load();
+  api.tabs.query = async () => { throw new Error('tabs indisponible'); };
+  const info = await api._messageListener({ action: 'getStatus' });
+  assert.strictEqual(info.attendanceTabOpen, false);
+});
+
+test('openAttendance réutilise l\'onglet ouvert, sinon en crée un', async () => {
+  const { api, bg } = await load();
+  assert.strictEqual((await bg.openAttendance()).reused, false);
+  assert.strictEqual(api.openedTabs.length, 1);
+
+  api.tabs.query = async () => [{ id: 7 }];
+  assert.strictEqual((await bg.openAttendance()).reused, true);
+  assert.strictEqual(api.openedTabs.length, 1);
+});
+
 // ----------------------------------------------------------------- badge
 
 group('badge de l\'icône');

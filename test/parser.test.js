@@ -434,6 +434,16 @@ test('remonte le temps écoulé sur place', () => {
   assert.strictEqual(P.decideNotification(session(1500), SETTINGS, NOW).elapsedSeconds, 3600);
 });
 
+// ---------------------------------------------- warnBeforeUnitSeconds
+
+group('warnBeforeUnitSeconds');
+
+test('le préavis se saisit en minutes, en secondes en mode test', () => {
+  assert.strictEqual(P.warnBeforeUnitSeconds(false), 60);
+  assert.strictEqual(P.warnBeforeUnitSeconds(undefined), 60);
+  assert.strictEqual(P.warnBeforeUnitSeconds(true), 1);
+});
+
 // ---------------------------------------------------- clampWarnBefore
 
 group('clampWarnBefore');

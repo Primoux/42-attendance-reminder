@@ -78,6 +78,10 @@
     button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; flex: 1; }
     button.primary:hover { background: var(--accent-hover); }
     .actions { display: flex; gap: 8px; margin-top: 12px; }
+    details { margin-top: 12px; }
+    summary { cursor: pointer; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+    .check { display: flex; gap: 6px; align-items: baseline; margin-top: 6px; color: var(--muted); }
+    .check small { display: block; font-size: 11px; }
     .notify-error { margin-top: 8px; font-size: 12px; color: var(--danger); }
     .notify-error[hidden] { display: none; }
     #msg { min-height: 16px; font-size: 12px; margin-top: 8px; text-align: center; color: var(--ok); }
@@ -102,12 +106,23 @@
   <h2>Alerte</h2>
   <div class="row">
     <label for="minutes">Prévenir avant l'échéance</label>
-    <input type="number" id="minutes" min="1" max="239" step="1"> <span>min</span>
+    <input type="number" id="minutes" min="1" max="239" step="1"> <span id="minutesUnit">min</span>
   </div>
   <div class="row" style="margin-top:6px">
     <label for="repeat">Relancer toutes les</label>
     <input type="number" id="repeat" min="1" max="120" step="1"> <span>min</span>
   </div>
+  <details>
+    <summary>Avancé</summary>
+    <label class="check">
+      <input type="checkbox" id="debug">
+      <span>Journal de debug <small>trace chaque tick dans la console</small></span>
+    </label>
+    <label class="check">
+      <input type="checkbox" id="testMode">
+      <span>Mode test <small>préavis en secondes, dès 5 s</small></span>
+    </label>
+  </details>
   <div class="actions">
     <button class="primary" id="save">Enregistrer</button>
   </div>

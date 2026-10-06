@@ -23,8 +23,8 @@ const STATUS = {
 const DEFAULT_SETTINGS = {
   warnBeforeSeconds: 30 * 60, // prévenir 30 min avant l'échéance annoncée
   repeatSeconds: 15 * 60,     // relance toutes les 15 min tant qu'on est badgé
-  testMode: false,            // seuils en secondes ; réglable via storage.local
-  debug: false                // logs console détaillés ; idem
+  testMode: false,            // préavis saisi en secondes, plancher à 5 s
+  debug: false                // logs console détaillés
 };
 
 // "On Site Unsaved", "On site (unsaved)", "ON-SITE - UNSAVED"...
@@ -321,6 +321,11 @@ function decideNotification(session, settings, nowMs) {
   return quiet;
 }
 
+/** Unité du champ de préavis dans le popup : la minute, la seconde en testMode. */
+function warnBeforeUnitSeconds(testMode) {
+  return testMode ? 1 : 60;
+}
+
 /** Borne le préavis saisi par l'utilisateur. En testMode on autorise 5 s. */
 function clampWarnBefore(seconds, testMode) {
   const min = testMode ? 5 : 60;
@@ -371,6 +376,6 @@ if (typeof module !== 'undefined' && module.exports) {
     normalize, findTimes, resolveClockTime, parseIso, readIsoAttr,
     collectCandidates, analyze, detect, detectExpiry, findShortestMatch, isOnSite, sessionExpiry,
     isSessionOver, isNewDeadline, EXPIRY_NOISE_SECONDS,
-    decideNotification, clampWarnBefore, badgeText, badgeColor, formatDuration, formatClock
+    decideNotification, warnBeforeUnitSeconds, clampWarnBefore, badgeText, badgeColor, formatDuration, formatClock
   };
 }

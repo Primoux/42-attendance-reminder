@@ -222,16 +222,29 @@ async function evaluateSession(now, s, state) {
  */
 const ATTENDANCE_URL = `https://${ATTENDANCE_HOST}/me`;
 
-async function openAttendance() {
+/**
+ * Onglets attendance ouverts. Filtrée par URL sur un hôte autorisé, la requête
+ * n'a pas besoin de la permission "tabs".
+ */
+async function attendanceTabs() {
   try {
-    const tabs = await api.tabs.query({ url: `*://${ATTENDANCE_HOST}/*` });
-    if (tabs && tabs.length) {
+    return (await api.tabs.query({ url: `*://${ATTENDANCE_HOST}/*` })) || [];
+  } catch (err) {
+    console.warn('[42 Reminder/bg] tabs.query indisponible:', err);
+    return [];
+  }
+}
+
+async function openAttendance() {
+  const tabs = await attendanceTabs();
+  if (tabs.length) {
+    try {
       await api.tabs.update(tabs[0].id, { active: true });
       await api.tabs.reload(tabs[0].id);
       return { ok: true, reused: true };
+    } catch (err) {
+      console.warn('[42 Reminder/bg] onglet attendance injoignable:', err);
     }
-  } catch (err) {
-    console.warn('[42 Reminder/bg] tabs.query indisponible:', err);
   }
   await api.tabs.create({ url: ATTENDANCE_URL });
   return { ok: true, reused: false };
@@ -248,7 +261,9 @@ api.runtime.onMessage.addListener((message) => {
 
     case 'getStatus':
       return (async () => {
-        const [settings, state] = await Promise.all([getSettings(), getState()]);
+        const [settings, state, tabs] = await Promise.all([
+          getSettings(), getState(), attendanceTabs()
+        ]);
         const now = Date.now();
         // Le popup peut s'ouvrir avant le tick d'alarme qui purgera la session
         // finie : ne pas l'afficher comme si elle courait encore.
@@ -259,6 +274,9 @@ api.runtime.onMessage.addListener((message) => {
           session,
           lastStatus: state.lastStatus,
           notifyError: state.notifyError || null,
+          // Distingue « aucun onglet attendance » de « onglet ouvert mais page
+          // illisible » : seul le second signale un DOM qui a changé.
+          attendanceTabOpen: tabs.length > 0,
           expiryMs,
           remainingSeconds: expiryMs ? Math.round((expiryMs - now) / 1000) : null,
           elapsedSeconds: session && session.startMs
