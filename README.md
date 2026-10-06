@@ -27,6 +27,10 @@ Depuis [Firefox Add-ons](https://addons.mozilla.org/fr/firefox/) — cherche
   sans recharger l'onglet. Un rebadge ou un badge out est ainsi vu sans F5,
   tant qu'un onglet attendance reste ouvert. Si la relecture échoue (réseau,
   session 42 expirée), ce que la page affiche continue de faire foi.
+  La réponse brute du serveur donne ses lignes de présence en UTC (le
+  navigateur les repasse en heure locale à l'affichage) : on n'y lit que
+  l'échéance annoncée, la seule en heure locale. Tant qu'elle confirme la page,
+  la page reste la source.
 - `background.js` est seul à décider des notifications. Tout son état vit dans
   `storage.local` : en MV3 la page background est non-persistante, la mémoire est
   perdue à tout moment.

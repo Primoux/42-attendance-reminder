@@ -247,6 +247,36 @@ function detect(root, nowMs) {
   });
 }
 
+/**
+ * Lecture d'une page redemandée au serveur (cf. `refresh` dans content.js).
+ *
+ * Le serveur rend les lignes de présence en UTC ; c'est le navigateur qui les
+ * repasse en heure locale à l'affichage. Dans sa réponse brute, « On Site
+ * Unsaved 22:55 23:01 » veut dire 00:55 à Lyon : aucune heure de ligne n'y est
+ * fiable, et la ligne en cours y ressemble à une session fermée. Seule
+ * l'échéance annoncée (« session expires at 04:55 ») est en heure locale.
+ *
+ * On n'en tire donc que l'échéance, ou le constat qu'il n'y en a plus. Le
+ * début est déduit de l'échéance : c'est l'heure du dernier badge.
+ */
+function detectRemote(root, nowMs) {
+  const expiry = detectExpiry(root, nowMs);
+  const fromDom = analyze(collectCandidates(root), nowMs);
+  if (expiry && expiry.expiryMs) {
+    return {
+      status: isOnSite(fromDom.status) ? fromDom.status : STATUS.ON_SITE,
+      startMs: expiry.expiryMs - SESSION_MAX_SECONDS * 1000,
+      expiryMs: expiry.expiryMs,
+      source: expiry.source,
+      raw: expiry.raw
+    };
+  }
+  // Badgé mais sans échéance annoncée : il ne resterait que les heures UTC des
+  // lignes pour la déduire. Mieux vaut ne rien conclure.
+  const status = fromDom.status === STATUS.OFF_SITE ? STATUS.OFF_SITE : STATUS.UNKNOWN;
+  return { status, startMs: null, expiryMs: null, source: fromDom.source, raw: fromDom.raw };
+}
+
 function isOnSite(status) {
   return status === STATUS.ON_SITE || status === STATUS.ON_SITE_UNSAVED;
 }
@@ -295,10 +325,13 @@ function isNewDeadline(currentExpiryMs, incomingExpiryMs) {
 
 /**
  * Deux lectures décrivent-elles le même badge ? Même tolérance que
- * `isNewDeadline` sur l'échéance, pour la même raison.
+ * `isNewDeadline` sur l'échéance, pour la même raison. « Unsaved » ou non ne
+ * compte pas : c'est une nuance d'affichage, pas un autre badge.
  */
 function sameBadgeState(a, b) {
-  if (!a || !b || a.status !== b.status) return false;
+  if (!a || !b) return false;
+  if (isOnSite(a.status) !== isOnSite(b.status)) return false;
+  if (!isOnSite(a.status) && a.status !== b.status) return false;
   if (!a.expiryMs || !b.expiryMs) return !a.expiryMs && !b.expiryMs;
   return Math.abs(a.expiryMs - b.expiryMs) <= EXPIRY_NOISE_SECONDS * 1000;
 }
@@ -421,7 +454,7 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     SESSION_MAX_SECONDS, ATTENDANCE_HOST, STATUS, DEFAULT_SETTINGS,
     normalize, findTimes, resolveClockTime, parseIso, readIsoAttr,
-    collectCandidates, analyze, detect, detectExpiry, findShortestMatch, isOnSite, sessionExpiry,
+    collectCandidates, analyze, detect, detectRemote, detectExpiry, findShortestMatch, isOnSite, sessionExpiry,
     isSessionOver, isNewDeadline, EXPIRY_NOISE_SECONDS,
     sameBadgeState, pickState, refreshDelayMs, REFRESH_SECONDS, REFRESH_URGENT_SECONDS,
     decideNotification, warnBeforeUnitSeconds, clampWarnBefore, badgeText, badgeColor, formatDuration, formatClock

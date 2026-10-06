@@ -113,6 +113,27 @@ test('un rebadge est vu sans F5, à la relecture suivante', async () => {
   assert.strictEqual(last(sent).source, 'fetch:expiry');
 });
 
+test('le serveur confirme la page : la page reste la source', async () => {
+  // la réponse brute est en UTC : ses heures de présence ne doivent pas
+  // remplacer celles, locales, de la page affichée
+  const page = ['On Site Unsaved 10:31 12:05 01:34', 'session expires at 14:31'];
+  const { sent, tick, server } = await load(page, at(12, 0));
+  server.texts = ['On Site Unsaved 08:31 10:05 01:34', 'session expires at 14:31'];
+  await tick(5 * MIN);
+  assert.strictEqual(server.calls, 1);
+  assert.strictEqual(last(sent).startMs, at(10, 31));
+  assert.strictEqual(last(sent).source, 'live-range+expiry');
+});
+
+test('après un rebadge, le début est l\'heure du badge, pas une heure UTC', async () => {
+  const page = ['On Site Unsaved 10:31 12:00 01:29', 'session expires at 14:31'];
+  const { sent, tick, server } = await load(page, at(12, 0));
+  server.texts = ['On Site Unsaved 10:04 10:05 00:01', 'session expires at 16:04'];
+  await tick(5 * MIN);
+  assert.strictEqual(last(sent).expiryMs, at(16, 4));
+  assert.strictEqual(last(sent).startMs, at(12, 4));
+});
+
 test('un badge out est vu sans F5', async () => {
   const { sent, tick, server } = await load(['On Site', 'session expires at 14:31'], at(12, 0));
   server.texts = ['Off Site'];

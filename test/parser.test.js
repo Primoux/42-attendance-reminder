@@ -380,6 +380,62 @@ test('rien n\'arrive : rien ne change', () => {
   assert.strictEqual(P.isNewDeadline(at(14, 31), null), false);
 });
 
+// ---------------------------------------------------------- detectRemote
+
+group('detectRemote');
+
+// Réponse brute du serveur à 01:01, heure de Lyon : les lignes sont en UTC
+// (22:55 = 00:55 local), seule l'échéance est en heure locale.
+const serverPage = () => dom(
+  'session expires at 04:55',
+  '03h 54m',
+  '6 Tuesday + 00:06 01:01 23:01 On Site 22:00 22:55 00:55 On Site Unsaved 22:55 23:01 00:06 5 Monday 07:02',
+  'On Site 22:00 22:55 00:55',
+  'On Site',
+  'On Site Unsaved 22:55 23:01 00:06',
+  'On Site Unsaved'
+);
+
+test('ne garde que l\'échéance, et en déduit le début', () => {
+  // 01:01 : le total du jour (« 01:01 ») colle à l'horloge par coïncidence et
+  // faisait passer un gros conteneur pour la ligne en cours
+  const now = atOffsetDay(1, 1, 1);
+  const r = P.detectRemote(serverPage(), now);
+  assert.strictEqual(r.expiryMs, atOffsetDay(1, 4, 55));
+  assert.strictEqual(r.startMs, atOffsetDay(1, 0, 55));
+  assert.strictEqual(r.source, 'expiry');
+  assert.strictEqual(P.isOnSite(r.status), true);
+});
+
+test('badgé mais sans échéance annoncée : ne conclut rien', () => {
+  const r = P.detectRemote(dom('On Site Unsaved 22:55'), atOffsetDay(1, 1, 1));
+  assert.strictEqual(r.status, 'unknown');
+  assert.strictEqual(r.expiryMs, null);
+});
+
+test('plus d\'échéance et présences fermées : off_site', () => {
+  const r = P.detectRemote(dom('On Site 08:00 09:30 01:30'), NOW);
+  assert.strictEqual(r.status, 'off_site');
+});
+
+// --------------------------------------------------------- sameBadgeState
+
+group('sameBadgeState');
+
+test('unsaved ou non, c\'est le même badge', () => {
+  assert.strictEqual(P.sameBadgeState(
+    { status: 'on_site', expiryMs: at(14, 31) },
+    { status: 'on_site_unsaved', expiryMs: at(14, 31, 20) }
+  ), true);
+});
+
+test('une autre échéance, ou un badge out, non', () => {
+  const a = { status: 'on_site', expiryMs: at(14, 31) };
+  assert.strictEqual(P.sameBadgeState(a, { status: 'on_site', expiryMs: at(16, 0) }), false);
+  assert.strictEqual(P.sameBadgeState(a, { status: 'off_site', expiryMs: null }), false);
+  assert.strictEqual(P.sameBadgeState({ status: 'off_site' }, { status: 'unknown' }), false);
+});
+
 // ------------------------------------------------------------- pickState
 
 group('pickState');

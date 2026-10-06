@@ -76,13 +76,21 @@ async function refresh() {
     }
     const doc = new DOMParser().parseFromString(await response.text(), 'text/html');
     const now = Date.now();
-    const state = detect(doc, now);
+    const state = detectRemote(doc, now);
     if (state.status === STATUS.UNKNOWN) {
       log('[fetch] rien de lisible dans la réponse : relecture ignorée');
       return;
     }
     state.source = `fetch:${state.source || 'aucune'}`;
-    fresh = { state, domState: detect(document, now) };
+    const domState = detect(document, now);
+    // Tant que le serveur confirme ce que la page affiche, la page reste la
+    // meilleure source : elle seule a les heures de présence en heure locale.
+    if (sameBadgeState(state, domState)) {
+      log('[fetch] le serveur confirme la page');
+      fresh = null;
+    } else {
+      fresh = { state, domState };
+    }
     tick('fetch');
   } catch (err) {
     log('[fetch] relecture en échec:', err.message || err);
