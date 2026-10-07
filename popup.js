@@ -1,16 +1,11 @@
 const api = typeof browser !== 'undefined' ? browser : chrome;
 
 const el = (id) => document.getElementById(id);
-const fields = {
-  minutes: el('minutes'),
-  repeat: el('repeat'),
-  debug: el('debug'),
-  testMode: el('testMode')
-};
+const fields = { minutes: el('minutes'), repeat: el('repeat') };
 
 let refreshTimer = null;
-// Un réglage sans champ dans le popup ne doit pas être écrasé à
-// l'enregistrement : storage.local.set remplace l'objet entier.
+// Les réglages sans champ dans le popup (debug, testMode) ne doivent pas être
+// écrasés à l'enregistrement : storage.local.set remplace l'objet entier.
 let currentSettings = null;
 
 function showMessage(text, isError) {
@@ -22,23 +17,18 @@ function showMessage(text, isError) {
 
 function applySettings(settings) {
   currentSettings = settings;
-  // Le champ de préavis change d'unité avec le mode test : c'est le réglage
-  // *enregistré* qui fait foi, pas la case tant qu'elle n'est pas validée.
+  // en mode test, le préavis se saisit en secondes
   const unit = warnBeforeUnitSeconds(settings.testMode);
   fields.minutes.value = Math.max(1, Math.round(settings.warnBeforeSeconds / unit));
   fields.minutes.max = (SESSION_MAX_SECONDS - 60) / unit;
   el('minutesUnit').textContent = settings.testMode ? 's' : 'min';
-  fields.debug.checked = Boolean(settings.debug);
-  fields.testMode.checked = Boolean(settings.testMode);
   fields.repeat.value = Math.round(settings.repeatSeconds / 60);
 }
 
 /** Un champ vide ne vaut pas 0 : on garde la valeur par défaut. */
 function readSettings(previous) {
-  // Le champ est encore dans l'unité affichée (l'ancien mode), alors que la
-  // borne à appliquer est celle du mode qu'on enregistre.
-  const unit = warnBeforeUnitSeconds(previous && previous.testMode);
-  const testMode = fields.testMode.checked;
+  const testMode = Boolean(previous && previous.testMode);
+  const unit = warnBeforeUnitSeconds(testMode);
   const minutes = Number(fields.minutes.value);
   const raw = fields.minutes.value !== '' && Number.isFinite(minutes) && minutes > 0
     ? minutes * unit
@@ -48,8 +38,6 @@ function readSettings(previous) {
   return Object.assign({}, previous, {
     warnBeforeSeconds,
     repeatSeconds: repeatMinutes * 60,
-    debug: fields.debug.checked,
-    testMode,
     _clamped: warnBeforeSeconds !== raw
   });
 }
