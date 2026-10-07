@@ -16,6 +16,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { createFakeApi } = require('./fake-api');
+const { dom } = require('./fake-dom');
 
 // ---------------------------------------------------------------- harnais
 
@@ -53,10 +54,13 @@ const flush = () => new Promise((resolve) => setImmediate(resolve));
  * -> { api, bg } où `bg` expose les fonctions déclarées (les `function` du
  * script atterrissent sur l'objet global du contexte).
  */
-async function load(seed) {
+async function load(seed, extras) {
   const api = createFakeApi();
   if (seed) for (const [k, v] of Object.entries(seed)) api.seed(k, v);
-  const sandbox = { browser: api, console: { log() {}, warn() {} }, Date, Math, Number, JSON };
+  const sandbox = Object.assign(
+    { browser: api, console: { log() {}, warn() {} }, Date, Math, Number, JSON, URL },
+    extras
+  );
   const context = vm.createContext(sandbox);
   vm.runInContext(parserSrc, context, { filename: 'parser.js' });
   vm.runInContext(backgroundSrc, context, { filename: 'background.js' });
@@ -258,6 +262,116 @@ test('un vrai rebadge, lui, relance le cycle et garde l\'heure d\'arrivée', asy
 });
 
 // ------------------------------------------------------------- remontées
+
+group('relecture du serveur sans onglet');
+
+/**
+ * Un serveur attendance factice : `texts` est ce que rendra la prochaine
+ * relecture, à passer en `extras` de load().
+ */
+function fakeServer(texts) {
+  const server = { texts, calls: 0, ok: true, fails: false, url: 'https://attendance.42lyon.fr/me' };
+  server.extras = {
+    fetch: async () => {
+      server.calls += 1;
+      if (server.fails) throw new Error('réseau coupé');
+      return { ok: server.ok, status: server.ok ? 200 : 500, url: server.url, text: async () => 'html' };
+    },
+    DOMParser: class { parseFromString() { return dom(...server.texts); } }
+  };
+  return server;
+}
+
+test('un rebadge est vu sans onglet : l\'échéance est repoussée, pas d\'alerte', async () => {
+  const server = fakeServer(['On Site', 'session expires at 16:04']);
+  const { api, bg } = await load(null, server.extras);
+  await bg.handleBadgeState(badge(at(14, 31), at(12, 0))); // puis l'onglet est fermé
+  api.reset();
+
+  await bg.onTick(at(14, 5)); // dans la fenêtre d'alerte de l'ancienne échéance
+  assert.strictEqual(server.calls, 1);
+  assert.strictEqual(api.state().session.expiryMs, at(16, 4));
+  assert.strictEqual(api.notified.length, 0);
+  assert.strictEqual(api.state().session.startMs, at(10, 31)); // l'arrivée est conservée
+});
+
+test('un onglet qui rapporte : le background ne relit rien', async () => {
+  const server = fakeServer(['On Site', 'session expires at 16:04']);
+  const { api, bg } = await load(null, server.extras);
+  await bg.handleBadgeState(badge(at(14, 31), at(12, 0)));
+  await bg.onTick(at(12, 1));
+  assert.strictEqual(server.calls, 0);
+  assert.strictEqual(api.state().session.expiryMs, at(14, 31));
+});
+
+test('un badge out est vu sans onglet', async () => {
+  const server = fakeServer(['Off Site']);
+  const { api, bg } = await load(null, server.extras);
+  await bg.handleBadgeState(badge(at(14, 31), at(12, 0)));
+  await bg.onTick(at(12, 10));
+  assert.strictEqual(api.state().session, null);
+  assert.strictEqual(api.state().lastStatus, 'off_site');
+});
+
+test('un premier badge est vu sans jamais ouvrir attendance', async () => {
+  const server = fakeServer(['On Site Unsaved', 'session expires at 14:31']);
+  const { api, bg } = await load(null, server.extras);
+  await bg.onTick(at(10, 40));
+  assert.strictEqual(api.state().session.expiryMs, at(14, 31));
+  assert.strictEqual(api.lastBadge(), '3h');
+});
+
+test('cadence : 5 min avec une session, 1 min près du préavis, 15 min sans session', async () => {
+  const server = fakeServer(['On Site', 'session expires at 14:31']);
+  const { bg } = await load(null, server.extras);
+  await bg.handleBadgeState(badge(at(14, 31), at(12, 0)));
+
+  await bg.onTick(at(12, 5));
+  assert.strictEqual(server.calls, 1);
+  await bg.onTick(at(12, 8));
+  assert.strictEqual(server.calls, 1);
+  await bg.onTick(at(12, 10));
+  assert.strictEqual(server.calls, 2);
+
+  await bg.onTick(at(13, 58)); // préavis 30 min + marge : une par minute
+  await bg.onTick(at(13, 59));
+  assert.strictEqual(server.calls, 4);
+
+  server.texts = ['Off Site'];
+  await bg.onTick(at(14, 0)); // badge out : plus de session
+  assert.strictEqual(server.calls, 5);
+  await bg.onTick(at(14, 10));
+  assert.strictEqual(server.calls, 5);
+  await bg.onTick(at(14, 15));
+  assert.strictEqual(server.calls, 6);
+});
+
+test('pas connecté, erreur ou réseau coupé : la session est gardée', async () => {
+  const server = fakeServer(['Sign in with 42']);
+  const { api, bg } = await load(null, server.extras);
+  await bg.handleBadgeState(badge(at(14, 31), at(12, 0)));
+
+  await bg.onTick(at(12, 5)); // page de connexion servie par attendance
+  server.texts = ['Off Site'];
+  server.url = 'https://auth.42.fr/login';
+  await bg.onTick(at(12, 10)); // redirigé vers la connexion 42
+  server.url = 'https://attendance.42lyon.fr/me';
+  server.ok = false;
+  await bg.onTick(at(12, 15));
+  server.fails = true;
+  await bg.onTick(at(12, 20));
+
+  assert.strictEqual(server.calls, 4);
+  assert.strictEqual(api.state().session.expiryMs, at(14, 31));
+});
+
+test('sans DOM ni fetch, le battement décide quand même', async () => {
+  const { api, bg } = await load();
+  await bg.handleBadgeState(badge(at(14, 31), at(12, 0)));
+  api.reset();
+  await bg.onTick(at(14, 5));
+  assert.strictEqual(api.notified.length, 1);
+});
 
 group('remontées au popup');
 
