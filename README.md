@@ -24,13 +24,20 @@ Depuis [Firefox Add-ons](https://addons.mozilla.org/fr/firefox/) — cherche
 - La page attendance ne se met pas à jour après un badge : seul son compte à
   rebours défile. `content.js` la redemande donc au serveur (toutes les 5 min,
   chaque minute à l'approche du préavis) et lit l'échéance dans la réponse,
-  sans recharger l'onglet. Un rebadge ou un badge out est ainsi vu sans F5,
-  tant qu'un onglet attendance reste ouvert. Si la relecture échoue (réseau,
-  session 42 expirée), ce que la page affiche continue de faire foi.
+  sans recharger l'onglet. Un rebadge ou un badge out est ainsi vu sans F5.
+  Si la relecture échoue (réseau, session 42 expirée), ce que la page affiche
+  continue de faire foi.
   La réponse brute du serveur donne ses lignes de présence en UTC (le
   navigateur les repasse en heure locale à l'affichage) : on n'y lit que
   l'échéance annoncée, la seule en heure locale. Tant qu'elle confirme la page,
   la page reste la source.
+- Sans onglet attendance ouvert, c'est `background.js` qui redemande la page
+  (`readServer`), au même rythme, dès qu'aucun onglet ne s'est manifesté depuis
+  deux minutes. Firefox joint la session 42 à la requête de lui-même : la
+  permission d'hôte suffit, aucun cookie n'est lu. Sans session en cours, la
+  relecture tombe à une toutes les 15 min, juste de quoi repérer un premier
+  badge sans jamais ouvrir attendance. Il faut rester connecté à attendance
+  dans Firefox ; déconnecté, la relecture ne donne rien et rien ne change.
 - `background.js` est seul à décider des notifications. Tout son état vit dans
   `storage.local` : en MV3 la page background est non-persistante, la mémoire est
   perdue à tout moment.
@@ -139,7 +146,8 @@ de laisser web-ext échouer sur un `SyntaxError` incompréhensible.
 `test/background.test.js` charge `parser.js` puis `background.js` dans un `vm`
 avec un faux `browser` (`test/fake-api.js`), comme Firefox charge les deux
 scripts dans la même page. C'est là que se testent les scénarios qui n'ont
-aucun DOM : onglet fermé, réveil après veille, badge du lendemain, rebadge.
+aucun DOM : onglet fermé, réveil après veille, badge du lendemain, rebadge,
+relecture du serveur sans onglet.
 `test/content.test.js` fait de même pour `content.js`, avec un faux `fetch` et
 une horloge avancée à la main : rebadge et badge out vus sans rechargement.
 

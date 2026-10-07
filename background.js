@@ -12,10 +12,20 @@ const NOTIFICATION_ID = '42-reminder';
 // Firefox n'échoue pas sur une iconUrl absente, il retombe juste sur l'icône
 // par défaut - d'où un SVG manquant passé inaperçu jusqu'en 1.0.0.
 const ICON_URL = api.runtime.getURL('icon-48.png');
+const ATTENDANCE_URL = `https://${ATTENDANCE_HOST}/me`;
+
+// Un onglet attendance parle toutes les 15 s et relit la page lui-même : tant
+// qu'il s'est manifesté depuis moins longtemps que ça, le background s'abstient.
+const TAB_SILENCE_MS = 2 * 60 * 1000;
+// Sans session à surveiller, il ne s'agit que de repérer un premier badge :
+// inutile de solliciter le serveur plus souvent.
+const IDLE_REFRESH_MS = 15 * 60 * 1000;
 
 const EMPTY_STATE = {
   session: null, // { startMs, expiryMs, status, lastSeenMs, notifiedCount, lastNotifiedMs }
   lastStatus: STATUS.UNKNOWN,
+  lastTabReportMs: 0, // dernier message d'un onglet attendance
+  lastRemoteMs: 0,    // dernière relecture du serveur par le background
   // Dernier échec de notification, remonté au popup : sans ça une extension qui
   // n'a plus le droit de notifier a l'air de fonctionner parfaitement.
   notifyError: null // { message, at }
@@ -64,6 +74,18 @@ async function handleBadgeState(message) {
   const incoming = message.state || {};
   const now = message.at || Date.now();
 
+  await applyBadgeState(state, settings, incoming, now);
+  state.lastStatus = incoming.status || STATUS.UNKNOWN;
+  state.lastTabReportMs = now;
+  await setState(state);
+  await evaluate(now, settings, state);
+}
+
+/**
+ * Applique à `state` un état de badge, qu'il vienne d'un onglet ou d'une
+ * relecture du serveur. Ne persiste rien : l'appelant enregistre.
+ */
+async function applyBadgeState(state, settings, incoming, now) {
   if (isOnSite(incoming.status) && (incoming.startMs || incoming.expiryMs)) {
     // Une session finie ne doit pas absorber le badge suivant : on garderait
     // son startMs et le popup afficherait la présence de la veille.
@@ -116,9 +138,65 @@ async function handleBadgeState(message) {
   }
   // STATUS.UNKNOWN : la page ne dit rien (mauvaise page, DOM changé) -> on garde
   // la session telle quelle plutôt que de perdre le timer.
+}
 
-  state.lastStatus = incoming.status || STATUS.UNKNOWN;
+/**
+ * Sans onglet attendance, personne ne dit qu'on a rebadgé ou badgé out : le
+ * background redemande alors la page au serveur. Firefox y joint la session 42
+ * de lui-même, la permission d'hôte suffit.
+ * -> l'état lu, ou null s'il n'y a rien à en tirer (pas l'heure, pas connecté,
+ * réseau coupé) : on garde alors ce qu'on savait.
+ */
+async function readServer(now, settings) {
+  // une page background a un DOM ; un service worker n'en aurait pas
+  if (typeof fetch !== 'function' || typeof DOMParser === 'undefined') return null;
+
+  const state = await getState();
+  if (now - (state.lastTabReportMs || 0) < TAB_SILENCE_MS) return null;
+  const tracked = isSessionOver(state.session, now) ? null : state.session;
+  const delay = tracked
+    ? refreshDelayMs({ expiryMs: sessionExpiry(tracked) }, settings.warnBeforeSeconds, now)
+    : IDLE_REFRESH_MS;
+  if (now - (state.lastRemoteMs || 0) < delay) return null;
+
+  // noté avant la requête : un serveur en panne ne doit pas être relancé à
+  // chaque minute
+  state.lastRemoteMs = now;
   await setState(state);
+
+  try {
+    const response = await fetch(ATTENDANCE_URL, { credentials: 'include', cache: 'no-store' });
+    // redirigé hors d'attendance : c'est la page de connexion
+    if (!response.ok || new URL(response.url).host !== ATTENDANCE_HOST) {
+      log(settings, 'relecture ignorée, réponse', response.status, response.url);
+      return null;
+    }
+    const doc = new DOMParser().parseFromString(await response.text(), 'text/html');
+    const remote = detectRemote(doc, now);
+    if (remote.status === STATUS.UNKNOWN) {
+      log(settings, 'relecture ignorée, rien de lisible dans la réponse');
+      return null;
+    }
+    log(settings, 'relecture du serveur :', remote.status,
+      remote.expiryMs ? `échéance ${formatClock(remote.expiryMs)}` : '');
+    return remote;
+  } catch (err) {
+    log(settings, 'relecture en échec :', (err && err.message) || err);
+    return null;
+  }
+}
+
+/** Le battement d'une minute : relecture éventuelle, puis décision. */
+async function onTick(now) {
+  const settings = await getSettings();
+  const remote = await readServer(now, settings);
+  // relu après la requête : un onglet a pu parler entre-temps
+  const state = await getState();
+  if (remote) {
+    await applyBadgeState(state, settings, remote, now);
+    state.lastStatus = remote.status;
+    await setState(state);
+  }
   await evaluate(now, settings, state);
 }
 
@@ -220,8 +298,6 @@ async function evaluateSession(now, s, state) {
  * on le recharge* : après un rechargement de l'extension, les onglets déjà
  * ouverts n'ont plus de content script et ne rapportent donc plus rien.
  */
-const ATTENDANCE_URL = `https://${ATTENDANCE_HOST}/me`;
-
 /**
  * Onglets attendance ouverts. Filtrée par URL sur un hôte autorisé, la requête
  * n'a pas besoin de la permission "tabs".
@@ -323,7 +399,7 @@ ensureAlarm().catch((err) => console.warn('[42 Reminder/bg] ensureAlarm:', err))
 
 api.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === ALARM_NAME) {
-    evaluate(Date.now()).catch((err) => console.warn('[42 Reminder/bg] alarm:', err));
+    onTick(Date.now()).catch((err) => console.warn('[42 Reminder/bg] alarm:', err));
   }
 });
 
