@@ -111,11 +111,18 @@ Clique sur l'icône de l'extension.
 Le préavis est borné à 1 min minimum : impossible de configurer une alerte qui
 arrive trop tard.
 
-La section « Avancé » du popup porte deux réglages de mise au point :
+Deux réglages de mise au point n'ont pas de champ dans le popup, pour ne pas
+l'encombrer : ils se posent depuis la console du background (`about:debugging`
+→ Inspecter).
 
-- **Journal de debug** : trace chaque tick dans la console de la page
-  attendance et du background (`about:debugging` → Inspecter).
-- **Mode test** : le préavis se saisit en secondes et descend à 5 s, pour
+```js
+browser.storage.local.get('settings').then(({ settings }) =>
+  browser.storage.local.set({ settings: { ...settings, debug: true } }));
+```
+
+- `debug` : trace chaque tick dans la console de la page attendance et du
+  background.
+- `testMode` : le préavis du popup se saisit en secondes et descend à 5 s, pour
   vérifier la chaîne de notification sans attendre des heures. Sous la minute,
   l'alerte part au tick du content script (15 s) : il faut un onglet attendance
   ouvert, l'alarme du background ne sonnant qu'une fois par minute.
