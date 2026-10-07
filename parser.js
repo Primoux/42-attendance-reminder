@@ -12,6 +12,9 @@ const SESSION_MAX_SECONDS = 4 * 3600;
 // attendance est un outil développé par 42 Lyon pour son propre campus : il n'y
 // a pas d'équivalent ailleurs, donc rien d'autre à cibler qu'un seul domaine.
 const ATTENDANCE_HOST = 'attendance.42lyon.fr';
+// Le motif de `host_permissions` : en MV3 Firefox peut ne pas l'accorder
+// (module chargé temporairement, Firefox < 127) et l'utilisateur peut le retirer.
+const ATTENDANCE_ORIGIN = `*://${ATTENDANCE_HOST}/*`;
 
 const STATUS = {
   ON_SITE: 'on_site',

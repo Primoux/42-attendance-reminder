@@ -20,6 +20,7 @@ function createFakeApi() {
     createdAlarms: [], // noms des alarmes créées
     badges: [],        // textes de badge successifs
     openedTabs: [],
+    hostGranted: true, // l'accès à attendance, que l'utilisateur peut retirer
 
     _messageListener: null,
     _alarmListener: null,
@@ -65,6 +66,10 @@ function createFakeApi() {
     action: {
       async setBadgeText({ text }) { api.badges.push(text); },
       async setBadgeBackgroundColor() {}
+    },
+
+    permissions: {
+      async contains() { return api.hostGranted; }
     },
 
     tabs: {

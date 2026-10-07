@@ -120,6 +120,10 @@ La section « Avancé » du popup porte deux réglages de mise au point :
   l'alerte part au tick du content script (15 s) : il faut un onglet attendance
   ouvert, l'alarme du background ne sonnant qu'une fois par minute.
 
+Si Firefox n'a pas accordé l'accès à `attendance.42lyon.fr` (module chargé
+temporairement, Firefox < 127, ou accès retiré dans `about:addons`), rien ne
+peut être surveillé : le popup l'affiche, avec un bouton « Autoriser l'accès ».
+
 Quand un onglet attendance est ouvert mais qu'aucun badge n'y est reconnu, le
 popup le dit (« Page attendance ouverte, mais aucun badge reconnu ») : soit tu
 n'es pas connecté, soit le format de la page a changé et la détection est à

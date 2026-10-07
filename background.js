@@ -141,6 +141,19 @@ async function applyBadgeState(state, settings, incoming, now) {
 }
 
 /**
+ * L'accès à attendance est-il accordé ? Sans lui, ni le content script ni la
+ * relecture ne fonctionnent, et rien ne le signale. Si l'API manque, on
+ * suppose que oui : mieux vaut une requête refusée qu'une extension muette.
+ */
+async function hasHostPermission() {
+  try {
+    return await api.permissions.contains({ origins: [ATTENDANCE_ORIGIN] });
+  } catch (err) {
+    return true;
+  }
+}
+
+/**
  * Sans onglet attendance, personne ne dit qu'on a rebadgé ou badgé out : le
  * background redemande alors la page au serveur. Firefox y joint la session 42
  * de lui-même, la permission d'hôte suffit.
@@ -158,6 +171,10 @@ async function readServer(now, settings) {
     ? refreshDelayMs({ expiryMs: sessionExpiry(tracked) }, settings.warnBeforeSeconds, now)
     : IDLE_REFRESH_MS;
   if (now - (state.lastRemoteMs || 0) < delay) return null;
+  if (!(await hasHostPermission())) {
+    log(settings, 'relecture impossible : accès à attendance non accordé');
+    return null;
+  }
 
   // noté avant la requête : un serveur en panne ne doit pas être relancé à
   // chaque minute
@@ -337,8 +354,8 @@ api.runtime.onMessage.addListener((message) => {
 
     case 'getStatus':
       return (async () => {
-        const [settings, state, tabs] = await Promise.all([
-          getSettings(), getState(), attendanceTabs()
+        const [settings, state, tabs, hostPermission] = await Promise.all([
+          getSettings(), getState(), attendanceTabs(), hasHostPermission()
         ]);
         const now = Date.now();
         // Le popup peut s'ouvrir avant le tick d'alarme qui purgera la session
@@ -353,6 +370,7 @@ api.runtime.onMessage.addListener((message) => {
           // Distingue « aucun onglet attendance » de « onglet ouvert mais page
           // illisible » : seul le second signale un DOM qui a changé.
           attendanceTabOpen: tabs.length > 0,
+          hostPermission,
           expiryMs,
           remainingSeconds: expiryMs ? Math.round((expiryMs - now) / 1000) : null,
           elapsedSeconds: session && session.startMs

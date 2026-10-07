@@ -365,6 +365,20 @@ test('pas connecté, erreur ou réseau coupé : la session est gardée', async (
   assert.strictEqual(api.state().session.expiryMs, at(14, 31));
 });
 
+test('accès à attendance non accordé : aucune requête, et le popup le sait', async () => {
+  const server = fakeServer(['On Site', 'session expires at 16:04']);
+  const { api, bg } = await load(null, server.extras);
+  api.hostGranted = false;
+  await bg.onTick(at(10, 40));
+  assert.strictEqual(server.calls, 0);
+  assert.strictEqual((await api._messageListener({ action: 'getStatus' })).hostPermission, false);
+
+  api.hostGranted = true;
+  await bg.onTick(at(10, 41));
+  assert.strictEqual(server.calls, 1);
+  assert.strictEqual((await api._messageListener({ action: 'getStatus' })).hostPermission, true);
+});
+
 test('sans DOM ni fetch, le battement décide quand même', async () => {
   const { api, bg } = await load();
   await bg.handleBadgeState(badge(at(14, 31), at(12, 0)));
