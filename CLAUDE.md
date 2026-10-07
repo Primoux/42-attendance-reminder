@@ -112,13 +112,14 @@ Relevé sur `attendance.42lyon.fr/me` en octobre 2026 (application SvelteKit,
 
 | Version | Contenu | État au 2026-10-07 |
 |---|---|---|
-| 1.1.0 | cycle de session et notifications fiabilisés | en ligne sur AMO |
-| 1.2.0 | rebadge vu sans F5 (relecture par l'onglet), session fantôme corrigée | envoyée sur AMO |
-| 1.3.0 | suivi sans onglet, accès au site manquant signalé | envoyée sur AMO |
-| 1.3.1 | réglages avancés retirés du popup (débordement) | zip construit, à envoyer |
+| 1.1.0 | cycle de session et notifications fiabilisés | remplacée |
+| 1.2.0 | rebadge vu sans F5 (relecture par l'onglet), session fantôme corrigée | remplacée |
+| 1.3.0 | suivi sans onglet, accès au site manquant signalé | en ligne sur AMO |
+| 1.3.1 | réglages avancés retirés du popup (débordement) | envoyée, en attente de validation |
 
-L'utilisateur a signalé une acceptation par Mozilla le 2026-10-07 sans préciser
-la version : lui demander l'état réel avant de supposer ce qui est en ligne.
+État lu sur la page développeur AMO (« Listed Version » / « Next Listed
+Version »). La fiche du module a une description en anglais (langue par défaut)
+et en français, à tenir à jour quand le comportement change.
 
 Pas encore vérifié en vrai : un rebadge fait onglet attendance fermé (la
 relecture du background lit bien l'échéance, le rebadge lui-même n'a pas été
