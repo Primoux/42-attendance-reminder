@@ -76,6 +76,7 @@ function renderStatus(info) {
   dot.className = 'dot';
   bar.className = '';
   renderNotifyError(info.notifyError);
+  el('permissionBox').hidden = info.hostPermission !== false;
 
   if (!info.expiryMs) {
     el('logtimeInfo').textContent = '';
@@ -147,6 +148,19 @@ el('save').addEventListener('click', async () => {
     ? `⚠️ Ajusté à ${formatDuration(settings.warnBeforeSeconds)} avant l'échéance`
     : `✅ Alerte ${formatDuration(settings.warnBeforeSeconds)} avant l'échéance`);
   refresh(false);
+});
+
+// `permissions.request` n'est accepté que dans le geste de l'utilisateur :
+// l'appel part d'ici, pas du background.
+el('grant').addEventListener('click', async () => {
+  try {
+    const granted = await api.permissions.request({ origins: [ATTENDANCE_ORIGIN] });
+    if (!granted) showMessage('❌ Accès refusé', true);
+    refresh(false);
+  } catch (err) {
+    showMessage('❌ Demande impossible', true);
+    console.warn('[42 Reminder/popup]', err);
+  }
 });
 
 el('openAttendance').addEventListener('click', async () => {

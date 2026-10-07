@@ -84,6 +84,7 @@
     .check small { display: block; font-size: 11px; }
     .notify-error { margin-top: 8px; font-size: 12px; color: var(--danger); }
     .notify-error[hidden] { display: none; }
+    .notify-error button { display: block; margin-top: 6px; width: 100%; font-size: 12px; padding: 5px; }
     #msg { min-height: 16px; font-size: 12px; margin-top: 8px; text-align: center; color: var(--ok); }
     #msg.error { color: var(--danger); }
   </style>
@@ -102,6 +103,10 @@
   </div>
 
   <div id="notifyError" class="notify-error" hidden></div>
+  <div id="permissionBox" class="notify-error" hidden>
+    ⚠️ L'extension n'a pas accès à attendance : elle ne peut rien surveiller.
+    <button id="grant">Autoriser l'accès</button>
+  </div>
 
   <h2>Alerte</h2>
   <div class="row">
