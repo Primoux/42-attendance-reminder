@@ -10,8 +10,8 @@ ne se déduit pas du code et l'état d'avancement.
 ## Travailler avec l'utilisateur
 
 - Échanges en français. Notes AMO (release notes, notes au relecteur) en anglais.
-- Donner des étapes numérotées et dire explicitement ce qui est attendu de lui :
-  une demande implicite (« dis-moi ce que tu vois ») n'est pas comprise.
+- Donner des étapes numérotées et dire explicitement, à chaque étape, quoi faire
+  et quoi renvoyer (« colle ici la ligne qui commence par … »).
 - Claude ne peut pas lancer Firefox ni atteindre attendance (connexion 42
   requise). Tout comportement réel se vérifie en lui faisant coller la console,
   ou le résultat d'une ligne de JS à coller. Toujours dire ce qui n'a pas été
