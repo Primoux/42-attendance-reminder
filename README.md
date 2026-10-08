@@ -3,24 +3,149 @@
 Extension Firefox qui te prévient **avant** que ta session d'attendance expire et
 que tu perdes ton logtime.
 
-Cible `attendance.42lyon.fr`. attendance est un outil de 42 Lyon pour le campus
-de Lyon : il n'existe pas ailleurs, l'extension n'a donc qu'un seul domaine à
-viser. Il vit dans `ATTENDANCE_HOST` (`parser.js`), d'où découlent l'URL du
-bouton « Ouvrir l'attendance » et le message du popup quand rien n'est détecté.
+Sur `attendance.42lyon.fr`, une session expire 4 h après ton dernier badge : si
+tu ne rebadges pas avant, le logtime est perdu. L'extension lit l'échéance que
+la page affiche et t'envoie une notification avant.
+
+**[Installer depuis Firefox Add-ons](https://addons.mozilla.org/fr/firefox/addon/42-attendance-reminder/)**
+
+Projet personnel, non officiel : ni 42 ni 42 Lyon n'y sont associés.
+
+## Ce que fait l'extension
+
+- **Notifie avant l'échéance.** Par défaut 30 min avant, puis une relance toutes
+  les 15 min, puis une alerte par minute dans les 5 dernières minutes. Si
+  l'échéance passe quand même, une dernière notification le dit (« Logtime
+  perdu »), une seule fois.
+- **Affiche le temps restant sur son icône** (`3h`, `42m`), arrondi vers le bas :
+  vert, orange une fois dans le préavis, rouge dans les 5 dernières minutes.
+- **Suit ta session même sans onglet attendance ouvert**, tant que Firefox
+  tourne et que tu y es connecté à attendance.
+- **Voit un rebadge ou un badge out sans F5.** La page attendance ne se met pas
+  à jour toute seule après un badge ; l'extension la redemande au serveur. Un
+  rebadge est vu en 5 min environ, en 1 min à l'approche du préavis.
+- **Ouvre attendance d'un clic** sur la notification (ou recharge l'onglet déjà
+  ouvert).
+
+Le popup (clic sur l'icône) montre le temps restant, l'heure d'échéance, l'heure
+de début de la présence et les deux réglages.
+
+## Ce qu'elle ne fait pas
+
+- **Elle ne badge pas à ta place** et n'envoie rien à attendance : elle ne fait
+  que lire la page (requêtes `GET`).
+- **Firefox fermé ou machine en veille, aucune alerte.** Au réveil de la
+  machine, si l'échéance est passée entre-temps, tu reçois la notification
+  « Logtime perdu ».
+- **Déconnecté d'attendance et sans onglet ouvert, elle est aveugle** : la
+  relecture tombe sur la page de connexion 42 et rien ne change. Le popup ne le
+  signale pas encore.
+- **Un premier badge, sans onglet attendance ni session en cours, est repéré
+  en 15 min environ**, pas immédiatement.
+- **L'heure de début affichée (« depuis … ») est indicative** : elle peut être
+  approximative juste après un rebadge et autour de minuit. Les alertes n'en
+  dépendent pas, seulement de l'échéance.
+- **Firefox uniquement** (115 ou plus récent), **campus de Lyon uniquement** :
+  attendance est un outil de 42 Lyon qui n'existe pas ailleurs.
+
+## Accès et données
+
+Aucune donnée ne sort de ton navigateur : pas de serveur tiers, pas de
+statistiques, pas de compte. Le seul domaine contacté est
+`attendance.42lyon.fr`.
+
+| Permission | Pourquoi |
+|---|---|
+| `notifications` | afficher les alertes |
+| `storage` | garder en local tes réglages et la session en cours |
+| `alarms` | se réveiller chaque minute, même sans onglet attendance |
+| accès à `attendance.42lyon.fr` | lire la page, et la redemander au serveur |
+
+Pas de permission `cookies` ni `tabs` : Firefox joint lui-même ta session 42 aux
+requêtes vers attendance, l'extension ne lit aucun cookie.
+
+**Ce qui est stocké** (`storage.local`, sur ta machine) : tes réglages, la
+session en cours (heure de début, échéance, statut, nombre et heure des
+notifications envoyées), l'heure du dernier échange avec un onglet et de la
+dernière relecture, et la dernière erreur de notification s'il y en a eu une.
+
+**Ce qui part sur le réseau** : des `GET` vers attendance avec ta session, pour
+relire la page.
+
+| Situation | Qui relit | Cadence |
+|---|---|---|
+| onglet attendance ouvert | l'onglet | toutes les 5 min |
+| aucun onglet, session en cours | l'extension en arrière-plan | toutes les 5 min |
+| échéance à moins de (préavis + 5 min) | l'un ou l'autre | chaque minute |
+| aucun onglet, aucune session | l'extension en arrière-plan | toutes les 15 min |
+
+La dernière ligne sert à repérer un premier badge sans que tu ouvres
+attendance : environ 96 requêtes par jour vers le serveur du campus tant que
+Firefox tourne. C'est un choix assumé, réglable dans le code
+(`IDLE_REFRESH_MS`, `background.js`).
 
 ## Installation
 
-Depuis [Firefox Add-ons](https://addons.mozilla.org/fr/firefox/) — cherche
-« 42 Attendance Reminder », ou installe-la depuis la page du module.
+1. Installe l'extension depuis
+   [Firefox Add-ons](https://addons.mozilla.org/fr/firefox/addon/42-attendance-reminder/).
+2. Ouvre `attendance.42lyon.fr` et connecte-toi. Reste connecté : c'est ta
+   session 42 dans Firefox qui permet à l'extension de lire la page.
+3. Clique sur l'icône de l'extension : le popup doit afficher ta session et le
+   temps restant.
+
+Si le popup affiche « L'extension n'a pas accès à attendance », clique sur
+« Autoriser l'accès ». Ça arrive avec Firefox < 127 (qui n'accorde pas l'accès
+au site à l'installation), si l'accès a été retiré dans `about:addons`, ou avec
+un module chargé temporairement.
+
+Les notifications passent par celles du système : si elles sont coupées pour
+Firefox, rien ne s'affiche. Quand le système en refuse une, le popup l'indique.
+
+## Configuration
+
+Clique sur l'icône de l'extension.
+
+- **Prévenir avant l'échéance** : préavis en minutes (défaut 30, de 1 min à
+  3 h 59).
+- **Relancer toutes les** : intervalle des rappels en minutes (défaut 15, de 1 à
+  120).
+
+Le préavis est borné à 1 min minimum : impossible de configurer une alerte qui
+arrive trop tard.
+
+Deux réglages de mise au point n'ont pas de champ dans le popup, pour ne pas
+l'encombrer : ils se posent depuis la console du background (`about:debugging`
+→ Inspecter).
+
+```js
+browser.storage.local.get('settings').then(({ settings }) =>
+  browser.storage.local.set({ settings: { ...settings, debug: true } }));
+```
+
+- `debug` : trace chaque tick dans la console de la page attendance et du
+  background.
+- `testMode` : le préavis du popup se saisit en secondes et descend à 5 s, pour
+  vérifier la chaîne de notification sans attendre des heures. Sous la minute,
+  l'alerte part au tick du content script (15 s) : il faut un onglet attendance
+  ouvert, l'alarme du background ne sonnant qu'une fois par minute.
+
+Quand un onglet attendance est ouvert mais qu'aucun badge n'y est reconnu, le
+popup le dit (« Page attendance ouverte, mais aucun badge reconnu ») : soit tu
+n'es pas connecté, soit le format de la page a changé et la détection est à
+revoir.
 
 ## Comment ça marche
 
-- `content.js` observe la page attendance (tick toutes les 15 s + MutationObserver sur
-  les rechargements ajax) et rapporte l'état de badge au background. Il ne parle
-  au background que si l'état a changé, ou au plus une fois par tick : `detect()`
-  parcourt le DOM trois fois, et la page rafraîchit son compte à rebours toute
-  seule — sans ce filtre, chaque mutation réveillait la page background et
-  écrivait dans `storage.local`.
+Le domaine visé vit dans `ATTENDANCE_HOST` (`parser.js`), d'où découlent l'URL
+du bouton « Ouvrir l'attendance » et le message du popup quand rien n'est
+détecté.
+
+- `content.js` observe la page attendance (tick toutes les 15 s, au retour sur
+  l'onglet, et MutationObserver sur les rechargements ajax) et rapporte l'état
+  de badge au background. Il ne parle au background que si l'état a changé, ou
+  au plus une fois par tick : `detect()` parcourt le DOM trois fois, et la page
+  rafraîchit son compte à rebours toute seule — sans ce filtre, chaque mutation
+  réveillait la page background et écrivait dans `storage.local`.
 - La page attendance ne se met pas à jour après un badge : seul son compte à
   rebours défile. `content.js` la redemande donc au serveur (toutes les 5 min,
   chaque minute à l'approche du préavis) et lit l'échéance dans la réponse,
@@ -51,23 +176,28 @@ Depuis [Firefox Add-ons](https://addons.mozilla.org/fr/firefox/) — cherche
 ### Détection
 
 La page d'attendance affiche elle-même son échéance : c'est la source la plus
-fiable, aucune déduction n'est nécessaire.
+fiable, aucune déduction n'est nécessaire. Les lignes de présence ne servent
+qu'à l'heure de début, et à déduire l'échéance quand la page ne l'annonce pas.
 
-| Signal | Priorité |
+| Signal | Ce qu'on en tire |
 |---|---|
-| `LA SESSION EXPIRE À 14:31` | la plus haute — échéance exacte |
-| compte à rebours `03h08m` | échéance = maintenant + reste |
-| attribut `datetime` ISO | heure de badge, immunisé aux fuseaux |
-| `On Site 10:31` | heure de badge, échéance déduite (+4h) |
+| `session expires at 14:31` | échéance exacte — prime sur tout le reste |
+| compte à rebours `03h 08m` | échéance = maintenant + reste, si la ligne ci-dessus manque |
+| attribut `datetime` ISO | heure de badge, immunisée aux fuseaux |
+| `On Site 10:31` | heure de badge, échéance déduite (+4 h) |
 | ligne dont une heure colle à maintenant | c'est la ligne en cours, pas une archive |
 | deux heures entièrement passées | session terminée → `off_site` |
 
-Une ligne d'attendance se termine par sa durée (`On Site Unsaved 10:31 → 11:22
+Une ligne d'attendance se termine par sa durée (`On Site Unsaved 10:31 11:22
 00:51`) : ce `00:51` se lit comme une heure, d'où la règle « une heure proche de
 maintenant » plutôt que « la dernière heure de la ligne ».
 
-Sont gérés : `On Site`, `On Site Unsaved`, `On site (unsaved)`, séparateurs `:`
-ou `h`, heure de la veille (badge après minuit), et le badge out (reset du timer).
+Sont gérés : `On Site`, `On Site Unsaved`, `On site (unsaved)`, l'échéance en
+anglais ou en français (`la session expire à`), séparateurs `:` ou `h`, heure de
+la veille (badge après minuit), et le badge out (reset du timer).
+
+Une échéance annoncée à plus de 4 h dans le futur est lue comme déjà passée :
+c'est une page restée ouverte, pas l'échéance du lendemain.
 
 Si aucun marqueur n'est trouvé, l'état passe à `unknown` et la session **n'est pas**
 effacée — le DOM de la page peut changer, on préfère garder le timer que le perdre.
@@ -100,41 +230,6 @@ découverte n'ouvre pas de session : il n'y a plus rien à surveiller, et l'ouvr
 pour la purger aussitôt ferait recréer-notifier-effacer à chaque tick.
 (`isSessionOver` sait aussi conclure sans échéance, à partir de `lastSeenMs` :
 plus que défensif aujourd'hui, pour de l'état écrit par une version antérieure.)
-
-## Configuration
-
-Clique sur l'icône de l'extension.
-
-- **Prévenir avant l'échéance** : préavis en minutes (défaut 30).
-- **Relancer toutes les** : intervalle des rappels.
-
-Le préavis est borné à 1 min minimum : impossible de configurer une alerte qui
-arrive trop tard.
-
-Deux réglages de mise au point n'ont pas de champ dans le popup, pour ne pas
-l'encombrer : ils se posent depuis la console du background (`about:debugging`
-→ Inspecter).
-
-```js
-browser.storage.local.get('settings').then(({ settings }) =>
-  browser.storage.local.set({ settings: { ...settings, debug: true } }));
-```
-
-- `debug` : trace chaque tick dans la console de la page attendance et du
-  background.
-- `testMode` : le préavis du popup se saisit en secondes et descend à 5 s, pour
-  vérifier la chaîne de notification sans attendre des heures. Sous la minute,
-  l'alerte part au tick du content script (15 s) : il faut un onglet attendance
-  ouvert, l'alarme du background ne sonnant qu'une fois par minute.
-
-Si Firefox n'a pas accordé l'accès à `attendance.42lyon.fr` (module chargé
-temporairement, Firefox < 127, ou accès retiré dans `about:addons`), rien ne
-peut être surveillé : le popup l'affiche, avec un bouton « Autoriser l'accès ».
-
-Quand un onglet attendance est ouvert mais qu'aucun badge n'y est reconnu, le
-popup le dit (« Page attendance ouverte, mais aucun badge reconnu ») : soit tu
-n'es pas connecté, soit le format de la page a changé et la détection est à
-revoir.
 
 ## Développement
 
@@ -182,10 +277,9 @@ for s in (16, 48, 96, 128):
    une version déjà envoyée, définitivement.
 2. `npm test && npm run lint && npm run build`
 3. [addons.mozilla.org/developers](https://addons.mozilla.org/developers/) →
-   *Submit a New Add-on* → **On your own** (auto-distribution, validation
-   automatique) ou *On this site* (revue humaine, publication publique).
-4. Envoie le zip. Le `.xpi` signé est proposé au téléchargement.
-5. Tes potes ouvrent le `.xpi` dans Firefox : l'installation est permanente.
+   le module → envoyer une nouvelle version, avec le zip.
+4. Mets à jour la description de la fiche (anglais et français) si le
+   comportement a changé.
 
 ## Fichiers
 
@@ -202,18 +296,16 @@ for s in (16, 48, 96, 128):
 
 ## Notes
 
-- Uniquement sur `attendance.42lyon.fr`, aucune donnée ne sort
-  du navigateur. Autre campus : ajoute son domaine dans `manifest.json`
-  (`host_permissions` **et** `content_scripts[0].matches`).
 - Vanilla JS, aucune dépendance.
 - Fuseaux horaires : les heures affichées sont interprétées dans le fuseau du
   navigateur. Si l'écart donne un temps négatif ou > 24 h, la valeur est rejetée
   plutôt que d'afficher n'importe quoi. Un timestamp ISO, quand la page en
   expose un, est préféré et le problème ne se pose pas.
 
-## Bugs/Améliorations?
+## Bugs / améliorations
 
-Partage sur Discord ou fais une PR.
+Ouvre une [issue](https://github.com/Primoux/42-attendance-reminder/issues),
+fais une PR, ou passe par Discord.
 
 ## Licence
 
