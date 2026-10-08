@@ -133,8 +133,6 @@ observé).
    (ci-dessus) et resserrer `scoreCandidate`.
 3. Signaler dans le popup quand le suivi est aveugle : déconnecté d'attendance
    et aucun onglet ouvert.
-4. Supprimer les branches `dev` et `origin/fiabilise-sessions-et-notifications`
-   si l'utilisateur confirme qu'elles ne servent plus (`dev` a divergé de `main`).
-5. Portage Chrome : `background.scripts` est propre à Firefox, et un service
+4. Portage Chrome : `background.scripts` est propre à Firefox, et un service
    worker n'a pas de `DOMParser` (il faudrait un document offscreen pour
    `readServer`).
